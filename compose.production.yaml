@@ -1,0 +1,59 @@
+name: flor-de-cacau-server
+x-app-env: &app-env
+  DATABASE_URL: postgres://flora:${DB_PASSWORD:?Configure DB_PASSWORD}@db:5432/flora
+  BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Configure BETTER_AUTH_SECRET}
+  BETTER_AUTH_URL: ${ORIGIN:?Configure ORIGIN}
+  ORIGIN: ${ORIGIN:?Configure ORIGIN}
+  ADMIN_EMAILS: ${ADMIN_EMAILS:?Configure ADMIN_EMAILS}
+  GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+  GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+  APP_ENV: production
+  UPLOAD_DIR: /app/uploads
+x-logging: &logging
+  driver: json-file
+  options: { max-size: '10m', max-file: '3' }
+services:
+  db:
+    image: postgres:18-bookworm
+    environment:
+      POSTGRES_DB: flora
+      POSTGRES_USER: flora
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Configure DB_PASSWORD}
+    volumes: [database:/var/lib/postgresql]
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U flora -d flora']
+      interval: 3s
+      timeout: 5s
+      retries: 40
+    restart: unless-stopped
+    logging: *logging
+  init:
+    image: flor-de-cacau-tools:${RELEASE_ID:?Configure RELEASE_ID}
+    build: { context: ., target: tools }
+    environment: *app-env
+    command: [npm, run, db:migrate]
+    profiles: [tools]
+    logging: *logging
+  app:
+    image: flor-de-cacau-app:${RELEASE_ID:?Configure RELEASE_ID}
+    build: { context: ., target: app }
+    environment: *app-env
+    ports: ['${APP_BIND:-127.0.0.1}:${APP_PORT:-5180}:3000']
+    volumes: [uploads:/app/uploads]
+    depends_on: { db: { condition: service_healthy } }
+    healthcheck:
+      test:
+        [
+          CMD,
+          node,
+          -e,
+          "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+        ]
+      interval: 3s
+      timeout: 5s
+      retries: 40
+    restart: unless-stopped
+    logging: *logging
+volumes:
+  database:
+  uploads:

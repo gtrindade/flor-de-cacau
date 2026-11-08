@@ -1,0 +1,15 @@
+Use case: stylized-concept.
+Asset type: first floral website background concept for Flor de Cacau, a neighborhood florist in Sabará, Brazil.
+
+Input image 1: approved simplified Flor de Cacau logo, used only as a style and palette reference. Do not place, copy, recreate or write this logo in the output.
+Input image 2: the original florist's wall mural, used only as a supporting reference for its garden of golden yellow daisies, pink flowers and green foliage.
+
+Create one restrained botanical background illustration for a responsive florist website. Warm ivory background, approximately #FBF7EE, with large areas of clean, solid, uninterrupted negative space for HTML headings, buttons and product photographs. Use simple flat, softly organic botanical forms that belong to the approved logo: a few dusty pink lily-like flowers, a few golden yellow daisy-like flowers, and minimal muted green stems and leaves. The flower shapes should have a handcrafted warmth but very little internal detail.
+
+Composition: wide landscape canvas, roughly 2:1. Keep the whole upper two thirds and the broad middle area nearly empty ivory. Place small, loose, asymmetrical floral clusters near the lower outer corners, with a few cropped leaves at the very edges. The clusters should feel like a gentle visual echo of the mural, occupying no more than about 20 percent of the total image area. Keep the bottom center open. This is a sparse background, not a lush floral border or a hero photograph. The decoration is nonessential and should crop gracefully on narrow phone screens.
+
+Palette: warm ivory #FBF7EE dominant; muted forest green based on #214B3E; dusty pink based on #D68E9D; golden yellow based on #D8AD42. Use these accents in soft, restrained amounts so forest-green HTML text can be read comfortably over the ivory field.
+
+Style: clean flat botanical illustration with crisp, simple silhouettes, balanced negative space, no photorealism, no fine texture, no shadows, no gradients or atmospheric fade, no 3D.
+
+Constraints: no text of any kind, no typography, no logo, no watermark, no icons, no UI, no buttons, no mockup, no product photographs, no buildings, no people, no vase, no cocoa pods, no coffee symbols. No complete frame around all four edges, no dense foliage or lawn, no floral pattern behind the central content area. Opaque warm ivory background, not transparency.

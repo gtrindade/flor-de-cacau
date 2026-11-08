@@ -1,0 +1,23 @@
+name: flor-de-cacau-edge
+services:
+  caddy:
+    image: caddy:2.11.9-alpine
+    environment:
+      FLORA_ORIGIN: ${ORIGIN:?Configure ORIGIN}
+    ports: ['80:80', '443:443']
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [backend]
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: { max-size: '10m', max-file: '3' }
+networks:
+  backend:
+    external: true
+    name: flor-de-cacau-server_default
+volumes:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,15 @@
+.env
+.env.*
+!.env.example
+.DS_Store
+/playwright/.auth/
+/playwright-report/
+/test-results/
+/blob-report/
+node_modules/
+.svelte-kit/
+build/
+dist/
+.local/
+.e2e/
+coverage/

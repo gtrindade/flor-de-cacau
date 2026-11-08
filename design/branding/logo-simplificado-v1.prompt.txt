@@ -1,0 +1,15 @@
+Use case: logo-brand.
+Asset type: first simplified logo concept for the Brazilian neighborhood florist "Flor de Cacau", intended for a responsive website header and mobile use.
+Input image: the attached storefront mural is the reference for the existing identity. Redesign that identity as a clean standalone logo; do not reproduce the wall, scenery or contact information.
+
+Primary request: one original, simplified, warmly handcrafted florist logo that remains recognizable from the mural. Preserve its botanical character and dark forest green, golden yellow, and dusty pink palette. Use a single distinctive stylized pink lily-like flower inspired by the large flower in the mural, with a simple golden yellow center and minimal green stem/leaf. Reduce the flower to a bold, readable silhouette with only a few flat shapes. Do not substitute a cocoa bean, cacao pod, coffee symbol, rose bouquet, or generic many-petaled daisy.
+
+Composition: one balanced horizontal logo lockup. Place the compact flower symbol alongside the wordmark, sized to work in a mobile header. "Flor de Cacau" is the dominant text, on one line if possible, in substantial dark forest green, highly legible organic hand-lettered typography that gently recalls the mural's yellow cursive but is more restrained, with open counters and no elaborate swashes. Add the exact small descriptor "FLORICULTURA" in simple, well-spaced uppercase letters beneath the wordmark. Keep that descriptor readable and secondary. Generous clean margin, optically balanced icon and lettering.
+
+Text (verbatim, no other text):
+"Flor de Cacau"
+"FLORICULTURA"
+
+Style: professional flat logo, crisp vector-like edges, simple solid colors, warm and approachable local flower shop. Forest green approximately #214B3E, golden yellow approximately #D8AD42, dusty pink approximately #D68E9D. Clean negative space between petals, stem, leaves, and letters. Designed to be shown over warm ivory or white.
+
+Constraints: genuinely transparent background with alpha. Exactly one logo, no duplicate versions, no concept board, no mockups, no paper texture, no wall, no decorative frame, no botanical border, no scattered flowers, no gradients, no shadows, no 3D, no watermarks, no phone numbers, no address, no slogan. The final name must read exactly "Flor de Cacau", with the word "de".

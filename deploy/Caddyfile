@@ -1,0 +1,8 @@
+{
+	acme_ca https://acme-v02.api.letsencrypt.org/directory
+}
+
+{$FLORA_ORIGIN} {
+	encode zstd gzip
+	reverse_proxy app:3000
+}

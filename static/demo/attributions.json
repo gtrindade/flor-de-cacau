@@ -1,0 +1,77 @@
+{
+  "notice": "Fotos ilustrativas apenas para demonstração local e seeds de teste; não representam produtos reais da Flor de Cacau.",
+  "images": [
+    {
+      "file": "rosas-vermelhas.jpg",
+      "author": "Karolina Bobek",
+      "source": "https://unsplash.com/photos/red-rose-bouquet-N-SDwTIagr4",
+      "downloadUrl": "https://images.unsplash.com/photo-1570118281125-84ec73b8008a?auto=format&fit=crop&fm=jpg&q=78&w=1200",
+      "alt": "Rosas vermelhas com folhas verdes sobre uma superfície de madeira",
+      "bytes": 135428,
+      "license": "Unsplash License",
+      "licenseUrl": "https://unsplash.com/license",
+      "demonstrationOnly": true,
+      "optimization": "JPEG, dimensão máxima 1000 px, qualidade 65; sem alteração da composição."
+    },
+    {
+      "file": "rosas-rosas.jpg",
+      "author": "Amelia Cui",
+      "source": "https://unsplash.com/photos/a-bouquet-of-pink-roses-in-a-vase-6oQYFVSCYFU",
+      "downloadUrl": "https://images.unsplash.com/photo-1709099158463-cae636593236?auto=format&fit=crop&fm=jpg&q=78&w=1200",
+      "alt": "Buquê de rosas cor-de-rosa envolto em papel claro",
+      "bytes": 72270,
+      "license": "Unsplash License",
+      "licenseUrl": "https://unsplash.com/license",
+      "demonstrationOnly": true,
+      "optimization": "JPEG, dimensão máxima 1000 px, qualidade 65; sem alteração da composição."
+    },
+    {
+      "file": "girassois.jpg",
+      "author": "Morishikiq",
+      "source": "https://unsplash.com/photos/yellow-sunflower-in-close-up-photography-3WFuXPtlm8o",
+      "downloadUrl": "https://images.unsplash.com/photo-1618197203210-f65d3f6887bc?auto=format&fit=crop&fm=jpg&q=78&w=1200",
+      "alt": "Girassóis sobre fundo claro",
+      "bytes": 104510,
+      "license": "Unsplash License",
+      "licenseUrl": "https://unsplash.com/license",
+      "demonstrationOnly": true,
+      "optimization": "JPEG, dimensão máxima 1000 px, qualidade 65; sem alteração da composição."
+    },
+    {
+      "file": "tulipas-rosas.jpg",
+      "author": "Larisa Birta",
+      "source": "https://unsplash.com/photos/pink-tulips-on-pink-surface-xWS5vwVay3A",
+      "downloadUrl": "https://images.unsplash.com/photo-1610444028097-40d9858bb44f?auto=format&fit=crop&fm=jpg&q=78&w=1200",
+      "alt": "Tulipas cor-de-rosa",
+      "bytes": 121916,
+      "license": "Unsplash License",
+      "licenseUrl": "https://unsplash.com/license",
+      "demonstrationOnly": true,
+      "optimization": "JPEG, dimensão máxima 1000 px, qualidade 65; sem alteração da composição."
+    },
+    {
+      "file": "tulipas-coloridas.jpg",
+      "author": "Zoritsa Valova",
+      "source": "https://unsplash.com/photos/bouquet-of-tulips-obEMlFCP0WI",
+      "downloadUrl": "https://images.unsplash.com/photo-1555403045-ae34912a214a?auto=format&fit=crop&fm=jpg&q=78&w=1200",
+      "alt": "Buquê de tulipas coloridas",
+      "bytes": 180916,
+      "license": "Unsplash License",
+      "licenseUrl": "https://unsplash.com/license",
+      "demonstrationOnly": true,
+      "optimization": "JPEG, dimensão máxima 1000 px, qualidade 65; sem alteração da composição."
+    },
+    {
+      "file": "cesta-floral.jpg",
+      "author": "Olga",
+      "source": "https://unsplash.com/photos/a-basket-filled-with-flowers-sitting-on-top-of-a-table--bf3iXetlcM",
+      "downloadUrl": "https://images.unsplash.com/photo-1683120099140-9c2adf9716ef?auto=format&fit=crop&fm=jpg&q=78&w=1200",
+      "alt": "Cesta com flores variadas",
+      "bytes": 77035,
+      "license": "Unsplash License",
+      "licenseUrl": "https://unsplash.com/license",
+      "demonstrationOnly": true,
+      "optimization": "JPEG, dimensão máxima 1000 px, qualidade 65; sem alteração da composição."
+    }
+  ]
+}

@@ -1,0 +1,67 @@
+x-test-env: &test-env
+  DATABASE_URL: postgres://flora_e2e:disposable@db:5432/flora_e2e
+  BETTER_AUTH_SECRET: disposable-test-secret-not-for-any-real-environment
+  BETTER_AUTH_URL: http://flora.test:3000
+  ORIGIN: http://flora.test:3000
+  ADMIN_EMAILS: admin@example.test
+  APP_ENV: e2e
+  E2E_NOW: 2026-11-04T15:00:00Z
+  UPLOAD_DIR: /app/uploads
+services:
+  db:
+    image: postgres:18-bookworm
+    environment: { POSTGRES_DB: flora_e2e, POSTGRES_USER: flora_e2e, POSTGRES_PASSWORD: disposable }
+    tmpfs: [/var/lib/postgresql]
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U flora_e2e -d flora_e2e]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  init:
+    build: { context: ., target: tools }
+    environment: *test-env
+    command:
+      [
+        sh,
+        -c,
+        'npm run db:migrate && npm run db:seed -- --mode e2e && node --import tsx scripts/seed-test-auth.ts'
+      ]
+    volumes: [test-auth:/artifacts/auth]
+    depends_on: { db: { condition: service_healthy } }
+  app:
+    networks:
+      default:
+        aliases: [flora.test]
+    build: { context: ., target: app }
+    environment: *test-env
+    volumes: [test-uploads:/app/uploads]
+    depends_on: { init: { condition: service_completed_successfully } }
+    healthcheck:
+      test:
+        [
+          CMD,
+          node,
+          -e,
+          "fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+        ]
+      interval: 3s
+      timeout: 5s
+      retries: 40
+  e2e:
+    build: { context: ., target: e2e }
+    environment:
+      <<: *test-env
+      CI: 'true'
+      BASE_URL: http://flora.test:3000
+      TEST_AUTH_DIR: /artifacts/auth
+      PLAYWRIGHT_HTML_REPORT: /artifacts/report
+      PLAYWRIGHT_OUTPUT_DIR: /artifacts/results
+    volumes:
+      - test-auth:/artifacts/auth:ro
+      - ./.e2e/artifacts:/artifacts
+    depends_on: { app: { condition: service_healthy } }
+    shm_size: 1gb
+    init: true
+volumes:
+  test-auth:
+  test-uploads:
