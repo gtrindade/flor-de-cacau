@@ -2,10 +2,14 @@
   import { createAuthClient } from 'better-auth/svelte';
   import Flower2 from '@lucide/svelte/icons/flower-2';
   import ArrowLeft from '@lucide/svelte/icons/arrow-left';
+  import FormFeedback from '#lib/components/FormFeedback.svelte';
   import type { PageProps } from './$types';
   let { data }: PageProps = $props();
   let error = $state('');
   let pending = $state(false);
+  let feedback = $derived({
+    error: error || (data.denied ? 'Esta conta não possui acesso administrativo.' : '')
+  });
   async function login() {
     pending = true;
     error = '';
@@ -39,9 +43,7 @@
       Entre com sua conta Google autorizada para cuidar do catálogo e das informações da
       floricultura.
     </p>
-    {#if error || data.denied}<p class="form-error" role="alert">
-        {error || 'Esta conta não possui acesso administrativo.'}
-      </p>{/if}<button
+    <FormFeedback form={feedback} notificationId="login-feedback" /><button
       class="button button-green"
       onclick={login}
       disabled={!data.googleConfigured || pending}

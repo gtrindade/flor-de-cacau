@@ -1,6 +1,6 @@
 # Validação da aplicação e implantação
 
-A suíte completa foi executada novamente em 12 de novembro de 2026, pelo snapshot de implantação `20261112T145705Z-67527`. A mesma release foi publicada no Raspberry e conferida por SSH e HTTPS público. A aplicação usa Node 24.22.2 e PostgreSQL 18; o Raspberry executa as imagens nativas ARM64.
+A suíte completa foi executada novamente em 12 de novembro de 2026, pelo snapshot de implantação `20261112T173017Z-72445`. A mesma release foi publicada no Raspberry e conferida por SSH e HTTPS público. A aplicação usa Node 24.22.2 e PostgreSQL 18; o Raspberry executa as imagens nativas ARM64.
 
 | Verificação                                             | Resultado                                                                                    |
 | ------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
@@ -8,15 +8,15 @@ A suíte completa foi executada novamente em 12 de novembro de 2026, pelo snapsh
 | Build de produção com adapter-node                      | Aprovado no Mac e no Raspberry ARM64                                                         |
 | Testes unitários de domínio, autorização e CLI          | 13 aprovados                                                                                 |
 | Contratos Google OAuth e ID token com provedor simulado | 6 aprovados                                                                                  |
-| E2E Chromium, Firefox, WebKit, Android e iPhone         | 145 aprovados, sem retries                                                                   |
+| E2E Chromium, Firefox, WebKit, Android e iPhone         | 150 aprovados, sem retries                                                                   |
 | Testes dos scripts de implantação, incluindo HTTPS      | 10 aprovados                                                                                 |
 | Reinício da aplicação no ambiente E2E                   | 5 rascunhos criados pela interface preservados                                               |
 | Limpeza do ambiente E2E                                 | Containers, rede e volumes descartáveis removidos                                            |
 | Runtime Sharp no Raspberry                              | Conversão WebP executada em ARM64                                                            |
-| Atualização no Raspberry                                | Sete produtos, sete variações e 50 mídias preservados; hashes dos dados anteriores idênticos |
+| Atualização no Raspberry                                | Seis produtos, seis variações e 49 mídias preservados; hashes dos dados anteriores idênticos |
 | Aplicação e PostgreSQL no Raspberry                     | Saudáveis                                                                                    |
 
-A execução completa usou `./deploy.sh update`, que chama `scripts/test-e2e.sh` sobre um snapshot imutável. Os 145 cenários Playwright concluíram em aproximadamente 11,4 minutos, além de build, preparação, testes unitários/integração e verificação após reinício. Os testes de implantação usam `python3 -m unittest discover -s tests/deploy -p 'test_*.py'`.
+A execução completa usou `./deploy.sh update`, que chama `scripts/test-e2e.sh` sobre um snapshot imutável. Os 150 cenários Playwright concluíram em aproximadamente 8,6 minutos, além de build, preparação, testes unitários/integração e verificação após reinício. Os testes de implantação usam `python3 -m unittest discover -s tests/deploy -p 'test_*.py'`.
 
 O relatório HTML está em `.e2e/artifacts/report/index.html`; screenshots em `.e2e/artifacts/results`; logs dos serviços em `.e2e/artifacts/services.log`; saída da execução em `.e2e/artifacts/execution.log`. Esses artefatos são locais e ignorados pelo Git. Os registros da primeira atualização, rollback e reinício do Raspberry estão em `.local/deploy-logs`.
 
@@ -34,13 +34,17 @@ O usuário relatou nova falha de leitura em um Pixel 8 com Chrome, escolhendo fo
 
 O teste novo simula nove fotos, uma falha temporária nas duas primeiras tentativas e seis fontes que permanecem ilegíveis. As seis são selecionadas novamente no próprio item e as nove são salvas com seus preços originais e os IDs das três fotos já enviadas preservados. A rolagem até a primeira foto foi verificada no primeiro lote e ao acrescentar outro, respeitando movimento reduzido. Os cenários passaram nos cinco perfis. A leitura pelo seletor nativo do Pixel 8 continua dependendo da confirmação no aparelho; os testes injetam a falha no navegador. Capturas `fotos-reselecionar.png` registram a recuperação no desktop e no mobile.
 
+Os avisos de formulários agora usam `svelte-sonner` 1.2.3 no topo da viewport. Foram conferidos criação e edição de produto com a página rolada, salvamentos repetidos, ausência de notificações duplicadas, fechamento manual, expiração em cinco segundos, texto de pelo menos 16 px, botão de fechar de 44 px, recuperação de validação e atualização das informações da loja. Erros do pedido também apareceram no topo com o diálogo aberto. Erros permanecem detalhados no formulário; confirmações inline somem após cinco segundos. Os placeholders de preço do produto e das opções por foto usam `0,00`. Capturas `toast-produto-salvo.png` registram a revisão visual no desktop e no celular.
+
+Duas execuções anteriores foram bloqueadas: uma excedeu o tempo ao encerrar um contexto Chromium, e outra perdeu um clique no catálogo do Firefox durante rolagem animada. O primeiro cenário passou isoladamente. Os perfis E2E passaram a usar movimento reduzido para evitar mudança do alvo durante cliques automáticos; o mesmo cenário do Firefox e os toasts passaram isoladamente antes de a suíte completa aprovar os 150 cenários sem retries. A animação de produção continua seguindo a preferência do visitante. Nenhuma execução reprovada foi publicada. O placeholder havia sido publicado separadamente pela release `20261112T154641Z-69365`.
+
 Todos os caminhos para WhatsApp foram conferidos em nova aba, preservando a aba original: pedido, cabeçalho, rodapé e links da biografia. A suíte cobre o link manual quando o navegador bloqueia a abertura automática, fechamento da aba temporária após erro e preservação dos campos para tentar novamente. As navegações ao WhatsApp são interceptadas; nenhuma mensagem real é enviada pelos testes.
 
 O formulário de entrega coleta CEP, rua/avenida, número, bairro, cidade e UF, com complemento e ponto de referência opcionais. Foram conferidos formato do CEP, UF válida, “s/n”, preservação após erro/troca de modalidade e mensagem completa. Retirada não inclui endereço. A revisão visual mantém espaçamento compacto, rótulos alinhados à borda esquerda dos campos e chevrons com recuo à direita. Produtos indisponíveis continuam públicos apenas para visualização; solicitar diretamente retorna HTTP 409.
 
 A prévia no Raspberry está em `https://flordecacau.ddns.net`, com certificado Let's Encrypt válido e redirecionamento HTTP para HTTPS. Saúde, páginas públicas e busca por `FC-LOJA-002` foram conferidas por HTTPS público com a validação normal de certificados. Uma solicitação gerou o redirecionamento 303 do SvelteKit, sem seguir o link ao WhatsApp; a mensagem contém a referência e o link HTTPS do produto. Uma origem estrangeira foi rejeitada com HTTP 403. O certificado emitido corresponde ao hostname e vence em 6 de fevereiro de 2027; o Caddy mantém a renovação automática. `/admin` sem sessão retorna 303 para `/entrar`.
 
-A release ativa conferida no servidor é `20261112T145705Z-67527`, publicada após a aprovação dos 145 E2E. A anterior é `20261112T135124Z-65769`. Esta correção não alterou o schema. Foram comparados hashes completos antes/depois dos sete produtos, sete variações e 50 mídias, todos idênticos. O seed não sobrescreveu conteúdo. Saúde e catálogo retornaram 200 por HTTPS e `/admin` anônimo redirecionou para login. A migration aditiva `0001_photo_variants` já havia sido aplicada na release anterior.
+A release ativa conferida no servidor é `20261112T173017Z-72445`, publicada após a aprovação dos 150 E2E. A anterior é `20261112T154641Z-69365`. Esta correção não alterou o schema. Foram comparados hashes completos antes/depois dos seis produtos, seis variações e 49 mídias, todos idênticos. O seed não sobrescreveu conteúdo. Saúde e catálogo retornaram 200 por HTTPS e `/admin` anônimo redirecionou para login. A migration aditiva `0001_photo_variants` já havia sido aplicada na release anterior.
 
 Atualização, rollback e reinício anteriores foram conferidos em 8 de novembro. A configuração privada mantém permissão 600 e o PostgreSQL não publica porta no host. O Docker está habilitado no boot e os containers usam `restart: unless-stopped`; não foi necessário reiniciar fisicamente o Raspberry. Foundry VTT permanece na porta 30000. Depois de usar o modo por foto, uma recuperação deve escolher release que entenda esse modo, conforme [deploy/README.md](../deploy/README.md).
 

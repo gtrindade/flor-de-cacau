@@ -123,6 +123,8 @@ O WhatsApp é interceptado antes da navegação externa. Os contratos OAuth usam
 
 ## Organização
 
+As confirmações e os erros dos formulários usam notificações globais no topo da tela (`svelte-sonner`), inclusive ao salvar com a página rolada. Elas duram cinco segundos, podem ser fechadas e permanecem legíveis no celular. Salvar novamente renova a confirmação; erros continuam detalhados no formulário depois que o toast desaparece. `FormFeedback.svelte` compartilha esse comportamento entre produtos, categorias, configurações, login, seleção de fotos e pedido. Sem JavaScript, os avisos retornados pelo servidor continuam no formulário.
+
 - `src/routes`: páginas SSR e ações de formulários; endpoints de saúde, upload e mídia.
 - `src/lib/server`: acesso ao banco, autenticação, autorização, DTOs públicos e processamento de imagens.
 - `src/lib/components`: catálogo, formulário WhatsApp, editor, uploader e componentes shadcn.

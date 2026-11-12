@@ -475,6 +475,9 @@ test('endereço preserva dados ao alternar modalidade e após erro do servidor',
   await page.getByRole('button', { name: 'Continuar no WhatsApp' }).click();
   const rejectedConversation = await rejectedPage;
   await expect(page.getByRole('alert')).toContainText('Selecione um estado válido.');
+  await expect(page.locator('[data-sonner-toast][data-type=error]')).toContainText(
+    'Selecione um estado válido.'
+  );
   await expect.poll(() => rejectedConversation.isClosed()).toBe(true);
   expect(page.context().pages()).toHaveLength(1);
   await expect(page.getByLabel('Rua ou avenida', { exact: true })).toHaveValue(testAddress.street);
@@ -529,6 +532,9 @@ test('falha ao preparar conversa fecha a aba temporária e permite tentar novame
   await page.getByRole('button', { name: 'Continuar no WhatsApp' }).click();
   const conversation = await newPage;
   await expect(page.getByRole('alert')).toContainText('Não foi possível preparar a conversa.');
+  await expect(page.locator('[data-sonner-toast][data-type=error]')).toContainText(
+    'Não foi possível preparar a conversa.'
+  );
   await expect.poll(() => conversation.isClosed()).toBe(true);
   expect(page.url()).toBe(originalURL);
   await expect(page.getByLabel('Quer contar mais alguma coisa?', { exact: false })).toHaveValue(
@@ -1414,7 +1420,7 @@ test('nove fotos: leitura temporária recupera e nova seleção substitui falhas
     const existing = JSON.parse(await page.locator('input[name=mediaIds]').inputValue());
     await expect(rows.first().getByRole('alert')).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Salvar produto', exact: true })).toBeDisabled();
-      await rows.nth(2).screenshot({ path: info.outputPath('fotos-reselecionar.png') });
+    await rows.nth(2).screenshot({ path: info.outputPath('fotos-reselecionar.png') });
     for (let i = 2; i <= 7; i++) {
       const row = rows.nth(i);
       await expect(row.getByRole('button', { name: 'Tentar novamente', exact: true })).toHaveCount(
@@ -1449,6 +1455,86 @@ test('nove fotos: leitura temporária recupera e nova seleção substitui falhas
     expect(variants.map((variant) => variant.price_cents)).toEqual(
       Array.from({ length: 9 }, (_, i) => (100 + i) * 100)
     );
+  } finally {
+    if (productId) await cleanupPhotoProduct(page, productId);
+  }
+});
+
+test('toasts ficam no topo ao salvar, repetem a confirmação e desaparecem automaticamente', async ({
+  page
+}, info) => {
+  test.setTimeout(90_000);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await login(page);
+  await page.goto('/admin/produtos/novo');
+  await page.getByLabel('Nome do produto', { exact: true }).fill(`Avisos ${info.project.name}`);
+  const price = page.getByLabel('Preço (R$)', { exact: true });
+  await expect(price).toHaveAttribute('placeholder', '0,00');
+  await price.fill('10');
+  const notifications = page.locator('[data-sonner-toast]');
+  let productId = '';
+  try {
+    await saveProduct(page);
+    await expect(notifications).toContainText('Produto criado com carinho.');
+    productId = page.url().split('/').pop()!.split('?')[0]!;
+    await notifications.getByRole('button', { name: 'Fechar notificação', exact: true }).click();
+    await expect(notifications).toHaveCount(0);
+    await page.evaluate(() => scrollTo(0, document.documentElement.scrollHeight));
+    await saveProduct(page);
+    await expect(notifications).toHaveCount(1);
+    await expect(notifications).toContainText('Produto salvo com carinho.');
+    const metrics = await notifications.evaluate((element) => ({
+      top: element.getBoundingClientRect().top,
+      left: element.getBoundingClientRect().left,
+      right: element.getBoundingClientRect().right,
+      viewport: innerWidth,
+      scroll: scrollY,
+      font: parseFloat(getComputedStyle(element.querySelector('[data-title]')!).fontSize)
+    }));
+    expect(metrics.scroll).toBeGreaterThan(200);
+    expect(metrics.top).toBeGreaterThanOrEqual(0);
+    expect(metrics.top).toBeLessThan(40);
+    expect(metrics.left).toBeGreaterThanOrEqual(0);
+    expect(metrics.right).toBeLessThanOrEqual(metrics.viewport + 1);
+    expect(metrics.font).toBeGreaterThanOrEqual(16);
+    expect(
+      (await notifications
+        .getByRole('button', { name: 'Fechar notificação', exact: true })
+        .boundingBox())!.height
+    ).toBeGreaterThanOrEqual(44);
+    await page.screenshot({ path: info.outputPath('toast-produto-salvo.png') });
+    await saveProduct(page);
+    await expect(notifications).toHaveCount(1);
+    await expect(notifications).toContainText('Produto salvo com carinho.');
+    await notifications.getByRole('button', { name: 'Fechar notificação', exact: true }).click();
+    await expect(notifications).toHaveCount(0);
+    await saveProduct(page);
+    await expect(notifications).toContainText('Produto salvo com carinho.');
+    await page.mouse.move(0, 0);
+    await expect(notifications).toHaveCount(0, { timeout: 8_000 });
+    await price.fill('-1');
+    await saveProduct(page);
+    await expect(notifications).toHaveAttribute('data-type', 'error');
+    await expect(notifications).toContainText('preço válido');
+    await notifications.getByRole('button', { name: 'Fechar notificação', exact: true }).click();
+    await expect(notifications).toHaveCount(0);
+    await expect(page.getByRole('alert')).toContainText('preço válido');
+    await expect(price).toHaveValue('-1');
+    await price.fill('12');
+    await saveProduct(page);
+    await expect(notifications).toHaveAttribute('data-type', 'success');
+    await expect(notifications).toContainText('Produto salvo com carinho.');
+    if (info.project.use.hasTouch) await expectReadableMobile(page);
+    await page.goto('/admin/configuracoes');
+    const saved = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        new URL(response.url()).pathname === '/admin/configuracoes'
+    );
+    await page.getByRole('button', { name: /Salvar informações/ }).click();
+    await saved;
+    await expect(notifications).toHaveAttribute('data-type', 'success');
+    await expect(notifications).toContainText('Informações da loja atualizadas.');
   } finally {
     if (productId) await cleanupPhotoProduct(page, productId);
   }

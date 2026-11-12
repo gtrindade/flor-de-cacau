@@ -1,5 +1,6 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
+  import FormFeedback from '#lib/components/FormFeedback.svelte';
   import Plus from '@lucide/svelte/icons/plus';
   import Pencil from '@lucide/svelte/icons/pencil';
   import EyeOff from '@lucide/svelte/icons/eye-off';
@@ -24,12 +25,7 @@
   </div>
   <a class="button button-green" href="/admin/produtos/novo"><Plus size={18} />Novo produto</a>
 </div>
-{#if form?.error}<p class="form-error" role="alert">{form.error}</p>{/if}{#if form?.success}<p
-    class="success"
-    role="status"
-  >
-    {form.success}
-  </p>{/if}
+<FormFeedback {form} />
 <div class="admin-products">
   {#each data.products as product}<article class="admin-product" data-testid="admin-product">
       <div class="admin-product-image">

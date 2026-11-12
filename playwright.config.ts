@@ -17,6 +17,7 @@ export default defineConfig({
   use: {
     baseURL: process.env.BASE_URL ?? 'http://localhost:5173',
     locale: 'pt-BR',
+    reducedMotion: 'reduce',
     timezoneId: 'America/Sao_Paulo',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',

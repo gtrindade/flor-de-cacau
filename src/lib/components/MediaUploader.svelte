@@ -23,6 +23,7 @@
   import X from '@lucide/svelte/icons/x';
   import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
   import { onDestroy, onMount, tick, untrack, type Snippet } from 'svelte';
+  import FormFeedback from './FormFeedback.svelte';
   type Photo = { id: string; url: string; alt?: string };
   let {
     initial = [],
@@ -45,6 +46,7 @@
   let pickerCounter = $state(0);
   let pickers = $state([0]);
   let error = $state('');
+  let selectionFeedback = $derived({ error });
   let uploadCounter = 0;
   let activeUploads = 0;
   let activeReads = 0;
@@ -358,7 +360,7 @@
     </label>
   {/each}
 </div>
-{#if error}<p class="form-error" role="alert">{error}</p>{/if}
+<FormFeedback form={selectionFeedback} notificationId="file-selection-feedback" />
 <div class="upload-grid" class:upload-option-list={!!details}>
   {#each photos as photo, index (photo.key)}
     <div

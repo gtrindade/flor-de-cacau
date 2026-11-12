@@ -1,5 +1,6 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
+  import FormFeedback from './FormFeedback.svelte';
   import { untrack, onMount } from 'svelte';
   import ArrowLeft from '@lucide/svelte/icons/arrow-left';
   import Save from '@lucide/svelte/icons/save';
@@ -118,7 +119,7 @@
         data-option-price
         inputmode="decimal"
         enterkeyhint="next"
-        placeholder="129,90"
+        placeholder="0,00"
         bind:value={option.price}
         maxlength="40"
         required={fields.publication === 'published' && option.showPrice}
@@ -180,11 +181,7 @@
     };
   }}
 >
-  {#if form?.error}<p class="form-error" role="alert">
-      {form.error}
-    </p>{/if}{#if form?.success || saved}<p class="success" role="status">
-      {form?.success || 'Produto criado com carinho.'}
-    </p>{/if}
+  <FormFeedback {form} savedMessage={saved ? 'Produto criado com carinho.' : undefined} />
   <fieldset class="editor-fields" disabled={!ready}>
     <legend class="sr-only">Informações para edição</legend>
     <fieldset class="product-mode-picker">
@@ -254,7 +251,7 @@
                   id="price"
                   name="price"
                   inputmode="decimal"
-                  placeholder="129,90"
+                  placeholder="0,00"
                   bind:value={fields.price}
                 />
               </div>

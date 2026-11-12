@@ -1,5 +1,6 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
+  import FormFeedback from '#lib/components/FormFeedback.svelte';
   import Plus from '@lucide/svelte/icons/plus';
   import Save from '@lucide/svelte/icons/save';
   import Trash2 from '@lucide/svelte/icons/trash-2';
@@ -15,12 +16,7 @@
     <p>Organize o catálogo com as categorias da loja.</p>
   </div>
 </div>
-{#if form?.error}<p class="form-error" role="alert">{form.error}</p>{/if}{#if form?.success}<p
-    class="success"
-    role="status"
-  >
-    {form.success}
-  </p>{/if}
+<FormFeedback {form} />
 <section class="form-panel category-admin">
   <h2>Nova categoria</h2>
   <form method="POST" action="?/save" use:enhance class="inline-form">

@@ -1,5 +1,6 @@
 <script lang="ts">
   import '../app.css';
+  import Notifications from '#lib/components/Notifications.svelte';
   import WhatsAppIcon from '#lib/components/WhatsAppIcon.svelte';
   import MapPin from '@lucide/svelte/icons/map-pin';
   import ArrowUpRight from '@lucide/svelte/icons/arrow-up-right';
@@ -8,6 +9,8 @@
   import type { LayoutProps } from './$types';
   let { data, children }: LayoutProps = $props();
 </script>
+
+<Notifications />
 
 <a href="#conteudo" class="skip-link">Ir para o conteúdo</a>
 <header class="site-header">

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { enhance } from '$app/forms';
+  import FormFeedback from './FormFeedback.svelte';
   import WhatsAppIcon from '#lib/components/WhatsAppIcon.svelte';
   import ArrowRight from '@lucide/svelte/icons/arrow-right';
   import Info from '@lucide/svelte/icons/info';
@@ -42,6 +43,7 @@
   let sending = $state(false);
   let whatsappUrl = $state('');
   let requestError = $state(untrack(() => form?.error ?? ''));
+  let requestFeedback = $derived({ error: requestError });
 </script>
 
 <Dialog.Root bind:open
@@ -110,7 +112,7 @@
       class="order-form"
     >
       <input type="hidden" name="variantId" value={variant.id} />
-      {#if requestError}<p class="form-error" role="alert">{requestError}</p>{/if}
+      <FormFeedback form={requestFeedback} notificationId="order-feedback" />
       {#if !settings.opening.open}<div class="notice">
           <Info size={18} />
           <p>

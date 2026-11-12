@@ -1,5 +1,6 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
+  import FormFeedback from '#lib/components/FormFeedback.svelte';
   import { untrack, onMount } from 'svelte';
   import Save from '@lucide/svelte/icons/save';
   import MediaUploader from '#lib/components/MediaUploader.svelte';
@@ -71,12 +72,7 @@
     };
   }}
 >
-  {#if form?.error}<p class="form-error" role="alert">{form.error}</p>{/if}{#if form?.success}<p
-      class="success"
-      role="status"
-    >
-      {form.success}
-    </p>{/if}
+  <FormFeedback {form} />
   <fieldset class="editor-fields" disabled={!ready}>
     <legend class="sr-only">Informações para edição</legend>
     <div class="editor-columns">
