@@ -7,7 +7,9 @@ import {
   jsonb,
   primaryKey,
   uniqueIndex,
-  check
+  check,
+  index,
+  type AnyPgColumn
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import type { WeeklyHours } from '../../domain';
@@ -71,9 +73,13 @@ export const products = pgTable(
     description: text('description').notNull().default(''),
     publication: text('publication').notNull().default('draft'),
     featured: boolean('featured').notNull().default(false),
+    mode: text('mode').notNull().default('standard'),
     ...dates
   },
-  (t) => [check('publication_values', sql`${t.publication} in ('draft','published','hidden')`)]
+  (t) => [
+    check('publication_values', sql`${t.publication} in ('draft','published','hidden')`),
+    check('product_mode_values', sql`${t.mode} in ('standard','photo_variants')`)
+  ]
 );
 export const variants = pgTable(
   'variants',
@@ -84,11 +90,15 @@ export const variants = pgTable(
       .references(() => products.id, { onDelete: 'cascade' }),
     sku: text('sku').notNull().unique(),
     name: text('name').notNull().default('Padrão'),
+    imageId: text('image_id').references((): AnyPgColumn => media.id, { onDelete: 'set null' }),
+    position: integer('position').notNull().default(0),
     priceCents: integer('price_cents'),
     showPrice: boolean('show_price').notNull().default(true),
     availability: text('availability').notNull().default('available')
   },
   (t) => [
+    uniqueIndex('variant_image_unique').on(t.imageId),
+    index('variant_product_position').on(t.productId, t.position),
     check('non_negative_price', sql`${t.priceCents} is null or ${t.priceCents} >= 0`),
     check(
       'availability_values',

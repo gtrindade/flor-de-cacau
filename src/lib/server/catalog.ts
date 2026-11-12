@@ -71,9 +71,9 @@ export async function getProducts(internal = false) {
     .from(products)
     .innerJoin(variants, eq(variants.productId, products.id))
     .where(internal ? undefined : eq(products.publication, 'published'))
-    .orderBy(desc(products.createdAt));
+    .orderBy(desc(products.createdAt), asc(variants.position), asc(variants.id));
   if (!rows.length) return [];
-  const ids = rows.map((r) => r.product.id);
+  const ids = [...new Set(rows.map((r) => r.product.id))];
   const [images, links] = await Promise.all([
     db.select().from(media).where(inArray(media.productId, ids)).orderBy(asc(media.position)),
     db
@@ -82,28 +82,46 @@ export async function getProducts(internal = false) {
       .innerJoin(categories, eq(productCategories.categoryId, categories.id))
       .where(inArray(productCategories.productId, ids))
   ]);
-  return rows.map(({ product, variant }) => ({
-    id: product.id,
-    slug: product.slug,
-    name: product.name,
-    description: product.description,
-    publication: product.publication,
-    featured: product.featured,
-    variant: {
+  const groups = new Map<
+    string,
+    { product: typeof products.$inferSelect; choices: (typeof variants.$inferSelect)[] }
+  >();
+  for (const { product, variant } of rows) {
+    const group = groups.get(product.id);
+    if (group) group.choices.push(variant);
+    else groups.set(product.id, { product, choices: [variant] });
+  }
+  return [...groups.values()].map(({ product, choices }) => {
+    const productImages = images
+      .filter((m) => m.productId === product.id)
+      .map((m) => ({ id: m.id, url: mediaUrl(m), alt: m.alt || product.name }));
+    const productVariants = choices.map((variant) => ({
       id: variant.id,
       sku: variant.sku,
       name: variant.name,
+      imageId: variant.imageId,
+      image: productImages.find((image) => image.id === variant.imageId) ?? null,
       priceCents: internal || variant.showPrice ? variant.priceCents : null,
       showPrice: variant.showPrice,
       availability: variant.availability
-    },
-    categories: links.filter((l) => l.productId === product.id).map((l) => l.category),
-    images: images
-      .filter((m) => m.productId === product.id)
-      .map((m) => ({ id: m.id, url: mediaUrl(m), alt: m.alt || product.name }))
-  }));
+    }));
+    return {
+      id: product.id,
+      slug: product.slug,
+      name: product.name,
+      description: product.description,
+      publication: product.publication,
+      featured: product.featured,
+      mode: product.mode,
+      variant: productVariants[0]!,
+      variants: productVariants,
+      categories: links.filter((l) => l.productId === product.id).map((l) => l.category),
+      images: productImages
+    };
+  });
 }
 export type Product = Awaited<ReturnType<typeof getProducts>>[number];
+export type ProductVariant = Product['variants'][number];
 export type Settings = Awaited<ReturnType<typeof getSettings>>;
 export async function getProduct(slugOrId: string, internal = false) {
   const all = await getProducts(internal);

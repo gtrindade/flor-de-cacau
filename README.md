@@ -132,7 +132,11 @@ O WhatsApp é interceptado antes da navegação externa. Os contratos OAuth usam
 - `tests`: regras de domínio, contratos OAuth e fluxos E2E.
 - `static/brand` e `design/branding`: artes aprovadas; `static/demo-loja/attributions.json` registra as fotos da loja usadas na demonstração; `static/demo/attributions.json` registra as imagens ilustrativas e fixtures E2E.
 
-Produto e variação têm relação 1:N. A primeira versão edita a variação padrão. Mídias têm tipo e ordenação para permitir vídeos posteriormente. Preço privado é removido no DTO público, antes do SSR ou da serialização. A mensagem WhatsApp usa os valores lidos no servidor no momento do envio. Produtos escondidos, rascunhos e excluídos retornam 404 público; imagens reais associadas também exigem produto publicado ou sessão autorizada.
+Produto e variação têm relação 1:N. O editor oferece **Um preço para o produto** (galeria de até oito fotos) e **Um preço por foto** (uma opção por imagem, sem limite de quantidade). No segundo modo, os campos de preço aparecem ao selecionar as fotos, enquanto a fila envia até duas imagens simultaneamente. Cada opção tem referência estável, preço, disponibilidade e exibição do preço próprios. Nome e referência podem ser personalizados em “Identificação e exibição do preço”.
+
+O cliente escolhe a foto antes de pedir. Links `/produtos/<slug>?opcao=<id>` abrem diretamente a opção, e a mensagem WhatsApp inclui esse link, o nome da opção e sua referência. Buscar a referência exata também abre a opção correspondente. Excluir uma foto remove sua opção e faz o link antigo retornar 404. Converter uma galeria existente mantém a referência da primeira opção; retornar ao preço único exige ter apenas uma opção salva.
+
+Mídias têm tipo e ordenação para permitir vídeos posteriormente. Preços privados de todas as opções são removidos no DTO público, antes do SSR ou da serialização. A mensagem WhatsApp usa os valores lidos no servidor no momento do envio. Produtos escondidos, rascunhos e excluídos retornam 404 público; imagens reais associadas também exigem produto publicado ou sessão autorizada.
 
 Fotos aceitam JPEG, PNG, WebP e HEIC/HEIF, até 15 MB, com limite de pixels no processamento principal. São rotacionadas conforme a orientação, reduzidas a 1800 px e convertidas em WebP, sem EXIF. O upload tem progresso, reenvio, escolha de capa e ordem. Fotos enviadas e depois abandonadas sem salvar ficam órfãs no armazenamento; uma rotina de limpeza poderá ser acrescentada antes de operação prolongada.
 

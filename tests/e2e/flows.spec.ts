@@ -904,3 +904,365 @@ test('sair invalida a sessão no servidor', async ({ page }, info) => {
   await page.goto('/admin');
   await expect(page).toHaveURL(/\/entrar/);
 });
+
+async function cleanupPhotoProduct(page: Page, id: string) {
+  const [row] = (await pool.query('SELECT name FROM products WHERE id=$1', [id])).rows;
+  if (row)
+    await page.request.post('/admin?/delete', {
+      form: { id, confirmation: row.name },
+      headers: { origin: process.env.BASE_URL!, accept: 'text/html' },
+      maxRedirects: 0
+    });
+}
+
+test('lote de dez fotos preserva preços, referências e links de cada opção', async ({
+  page,
+  request
+}, info) => {
+  test.setTimeout(120_000);
+  await login(page);
+  await page.goto('/admin/produtos/novo');
+  await page.getByRole('radio', { name: 'Um preço por foto', exact: true }).check();
+  const name = `Orquídeas lote ${info.project.name}`;
+  await page.getByLabel('Nome do produto', { exact: true }).fill(name);
+  await page
+    .getByLabel('Descrição', { exact: true })
+    .fill('Cada foto corresponde a uma orquídea com seu próprio preço.');
+  await page.getByLabel('Visibilidade', { exact: true }).selectOption('published');
+  const { readFile } = await import('node:fs/promises');
+  const buffer = await readFile('static/demo-loja/orquidea-branca.webp');
+  const imageIds = new Map<string, string>();
+  let concurrent = 0;
+  let peak = 0;
+  let uploadsStarted = 0;
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let releaseFirst!: () => void;
+  const firstUpload = new Promise<void>((resolve) => {
+    releaseFirst = resolve;
+  });
+  page.on('response', async (response) => {
+    if (new URL(response.url()).pathname !== '/admin/upload' || !response.ok()) return;
+    const photo = await response.json();
+    imageIds.set(photo.alt, photo.id);
+    releaseFirst();
+  });
+  await page.route('**/admin/upload', async (route) => {
+    const first = uploadsStarted++ === 0;
+    concurrent++;
+    peak = Math.max(peak, concurrent);
+    try {
+      await gate;
+      // Forward the native multipart body. Replaying it with route.fetch loses file bytes in WebKit.
+      // The first request waits for the second response, exercising completion out of selection order.
+      if (first) await firstUpload;
+      await route.continue();
+    } finally {
+      concurrent--;
+    }
+  });
+  let productId = '';
+  try {
+    await page.getByLabel('Escolher fotos', { exact: true }).setInputFiles(
+      Array.from({ length: 10 }, (_, i) => ({
+        name: `orquidea-${i + 1}.webp`,
+        mimeType: 'image/webp',
+        buffer
+      }))
+    );
+    const rows = page.getByTestId('photo-option-editor');
+    await expect(rows).toHaveCount(10);
+    await expect(page.getByRole('button', { name: 'Salvar produto', exact: true })).toBeDisabled();
+    for (let i = 0; i < 10; i++)
+      await rows
+        .nth(i)
+        .getByLabel('Preço (R$)', { exact: true })
+        .fill(String(100 + i * 10));
+    await expect.poll(() => concurrent).toBe(2);
+    expect(peak).toBeLessThanOrEqual(2);
+    release();
+    await expect(page.getByRole('button', { name: 'Salvar produto', exact: true })).toBeEnabled();
+    await expect.poll(() => imageIds.size).toBe(10);
+    expect(JSON.parse(await page.locator('input[name=mediaIds]').inputValue())).toEqual(
+      Array.from({ length: 10 }, (_, i) => imageIds.get(`orquidea-${i + 1}.webp`))
+    );
+    if (info.project.use.hasTouch) {
+      await expectReadableMobile(page);
+      const viewport = page.viewportSize()!;
+      await page.setViewportSize({ width: 320, height: 900 });
+      const enlarged = await page.addStyleTag({ content: 'html { font-size: 200% !important; }' });
+      await expectReadableMobile(page);
+      await enlarged.evaluate((element) => element.parentNode?.removeChild(element));
+      await page.setViewportSize(viewport);
+    }
+    await rows.first().screenshot({ path: info.outputPath('editor-preco-por-foto.png') });
+    await rows.nth(3).getByLabel('Preço (R$)', { exact: true }).fill('-1');
+    await saveProduct(page);
+    await expect(page.getByRole('alert')).toContainText('opção 4');
+    await expect(rows.nth(7).getByLabel('Preço (R$)', { exact: true })).toHaveValue('170');
+    await rows.nth(3).getByLabel('Preço (R$)', { exact: true }).fill('130');
+    await saveProduct(page);
+    await expect(page.getByRole('status')).toContainText('criado');
+    productId = page.url().split('/').pop()!.split('?')[0]!;
+    const [product] = (await pool.query('SELECT slug, mode FROM products WHERE id=$1', [productId]))
+      .rows;
+    expect(product.mode).toBe('photo_variants');
+    let choices = (
+      await pool.query(
+        'SELECT id, sku, image_id, price_cents FROM variants WHERE product_id=$1 ORDER BY position',
+        [productId]
+      )
+    ).rows;
+    expect(choices).toHaveLength(10);
+    expect(new Set(choices.map((option) => option.sku)).size).toBe(10);
+    for (let i = 0; i < 10; i++) {
+      expect(choices[i].price_cents).toBe((100 + i * 10) * 100);
+      expect(choices[i].image_id).toBe(imageIds.get(`orquidea-${i + 1}.webp`));
+    }
+    const chosen = choices[4];
+    const deepLink = `/produtos/${product.slug}?opcao=${chosen.id}`;
+    await page.goto(`/catalogo?q=${chosen.sku.toLowerCase()}`);
+    await expect(page.getByTestId('product-card')).toHaveCount(1);
+    await page.getByRole('link', { name: `Ver ${name}`, exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`opcao=${chosen.id}`));
+    await page.reload();
+    await expect(page.locator('.detail-price')).toContainText('140,00');
+    await expect(page.locator('.gallery-main img')).toHaveAttribute(
+      'src',
+      `/media/${chosen.image_id}`
+    );
+    await page.getByRole('button', { name: 'Pedir via WhatsApp' }).click();
+    let message = await collectWhatsApp(page);
+    expect(message).toContain(chosen.sku);
+    expect(message).toContain('140,00');
+    expect(message).toContain(deepLink);
+    expect(message).not.toContain(choices[0].sku);
+    await page.goto(`/admin/produtos/${productId}`);
+    const editor = page.getByTestId('photo-option-editor');
+    await editor
+      .first()
+      .getByLabel('Disponibilidade da opção', { exact: true })
+      .selectOption('unavailable');
+    await editor.nth(4).getByText('Identificação e exibição do preço', { exact: true }).click();
+    await editor.nth(4).getByLabel('Exibir preço desta opção', { exact: true }).uncheck();
+    await editor.nth(4).getByLabel('Preço (R$)', { exact: true }).fill('9876,54');
+    await page.getByRole('button', { name: 'Mover foto 10 para antes', exact: true }).click();
+    await saveProduct(page);
+    await expect(page.getByRole('status')).toContainText('salvo');
+    const publicHTML = await (await request.get(deepLink)).text();
+    expect(publicHTML).not.toContain('987654');
+    expect(publicHTML).not.toContain('9876,54');
+    await page.goto(`/produtos/${product.slug}`);
+    await expect(page.getByTestId('photo-option')).toHaveCount(10);
+    if (info.project.use.hasTouch) await expectReadableMobile(page);
+    await page.goto(`/produtos/${product.slug}?opcao=${choices[0].id}`);
+    await expect(
+      page.getByRole('button', { name: /Pedir via WhatsApp|Consultar disponibilidade/ })
+    ).toHaveCount(0);
+    expect(
+      (
+        await request.post(`/produtos/${product.slug}?/solicitar`, {
+          form: { variantId: choices[0].id },
+          headers: { origin: process.env.BASE_URL!, accept: 'text/html' },
+          maxRedirects: 0
+        })
+      ).status()
+    ).toBe(409);
+    await page.goto(deepLink);
+    await page.getByRole('button', { name: 'Pedir via WhatsApp' }).click();
+    message = await collectWhatsApp(page);
+    expect(message).toContain(chosen.sku);
+    expect(message).toContain('consultar o preço');
+    expect(message).not.toContain('9876');
+    await page.goto(`/admin/produtos/${productId}`);
+    await page.getByRole('button', { name: 'Remover foto 2', exact: true }).click();
+    await saveProduct(page);
+    await expect(page.getByRole('status')).toContainText('salvo');
+    expect((await request.get(`/produtos/${product.slug}?opcao=${choices[1].id}`)).status()).toBe(
+      404
+    );
+    expect((await request.get(`/media/${choices[1].image_id}`)).status()).toBe(404);
+    expect((await request.get(deepLink)).status()).toBe(200);
+    choices = (await pool.query('SELECT id FROM variants WHERE product_id=$1', [productId])).rows;
+    expect(choices).toHaveLength(9);
+    expect(choices.some((option) => option.id === chosen.id)).toBe(true);
+    await page.goto(`/produtos/${product.slug}`);
+    await page.screenshot({ path: info.outputPath('opcoes-por-foto.png'), fullPage: true });
+  } finally {
+    release();
+    releaseFirst();
+    if (productId) await cleanupPhotoProduct(page, productId);
+  }
+});
+
+test('servidor valida vínculos das opções e mantém o produto inteiro em uma falha', async ({
+  page,
+  request
+}, info) => {
+  await login(page);
+  const { readFile } = await import('node:fs/promises');
+  const buffer = await readFile('static/demo-loja/orquidea-rajada.webp');
+  const origin = process.env.BASE_URL!;
+  const headers = { origin, accept: 'text/html' };
+  const created: string[] = [];
+  async function create(name: string) {
+    const photo = await (
+      await page.request.post('/admin/upload', {
+        multipart: { file: { name: 'orquidea.webp', mimeType: 'image/webp', buffer } },
+        headers: { origin }
+      })
+    ).json();
+    const option = {
+      id: '',
+      imageId: photo.id,
+      name: '',
+      sku: '',
+      price: '150',
+      showPrice: true,
+      availability: 'available'
+    };
+    const form = {
+      name,
+      description: 'Opção de teste',
+      mode: 'photo_variants',
+      publication: 'published',
+      mediaIds: JSON.stringify([photo.id]),
+      variants: JSON.stringify([option])
+    };
+    const response = await page.request.post('/admin/produtos/novo', {
+      form,
+      headers,
+      maxRedirects: 0
+    });
+    expect(response.status()).toBe(303);
+    const id = response.headers().location!.split('/').pop()!.split('?')[0]!;
+    created.push(id);
+    const [product] = (await pool.query('SELECT slug FROM products WHERE id=$1', [id])).rows;
+    const [stored] = (await pool.query('SELECT * FROM variants WHERE product_id=$1', [id])).rows;
+    return {
+      id,
+      slug: product.slug,
+      form,
+      option: { ...option, id: stored.id, sku: stored.sku },
+      stored
+    };
+  }
+  try {
+    const a = await create(`Orquídea A ${info.project.name}`);
+    const b = await create(`Orquídea B ${info.project.name}`);
+    const invalidOptions = [
+      [{ ...a.option, id: b.option.id }],
+      [{ ...a.option, imageId: b.option.imageId }],
+      [{ ...a.option, sku: b.option.sku }],
+      [{ ...a.option, price: '' }]
+    ];
+    for (const choices of invalidOptions) {
+      const response = await page.request.post(`/admin/produtos/${a.id}`, {
+        form: {
+          ...a.form,
+          name: 'Não deve salvar',
+          mediaIds: JSON.stringify(choices.map((option) => option.imageId)),
+          variants: JSON.stringify(choices)
+        },
+        headers,
+        maxRedirects: 0
+      });
+      expect(response.status()).toBe(400);
+      const [after] = (await pool.query('SELECT name FROM products WHERE id=$1', [a.id])).rows;
+      expect(after.name).toBe(a.form.name);
+      const [variant] = (await pool.query('SELECT * FROM variants WHERE product_id=$1', [a.id]))
+        .rows;
+      expect(variant.id).toBe(a.stored.id);
+      expect(variant.image_id).toBe(a.stored.image_id);
+      expect(variant.price_cents).toBe(15000);
+    }
+    expect((await request.get(`/produtos/${a.slug}?opcao=${b.option.id}`)).status()).toBe(404);
+    expect(
+      (
+        await request.post(`/produtos/${a.slug}?/solicitar`, {
+          form: { variantId: b.option.id },
+          headers,
+          maxRedirects: 0
+        })
+      ).status()
+    ).toBe(400);
+    expect(
+      (
+        await request.post(`/produtos/${a.slug}?/solicitar`, { form: {}, headers, maxRedirects: 0 })
+      ).status()
+    ).toBe(400);
+    expect((await request.get(`/media/${a.option.imageId}`)).status()).toBe(200);
+    expect((await request.get(`/media/${b.option.imageId}`)).status()).toBe(200);
+  } finally {
+    for (const id of created) await cleanupPhotoProduct(page, id);
+  }
+});
+
+test('converter galeria existente mantém fotos e a referência original', async ({ page }, info) => {
+  await login(page);
+  await page.goto('/admin/produtos/novo');
+  const name = `Converter galeria ${info.project.name}`;
+  await page.getByLabel('Nome do produto', { exact: true }).fill(name);
+  await page.getByLabel('Preço (R$)', { exact: true }).fill('120');
+  await page.getByLabel('Visibilidade', { exact: true }).selectOption('published');
+  await selectPhotos(page, ['static/demo/rosas-vermelhas.jpg', 'static/demo/girassois.jpg']);
+  await expect(page.getByRole('button', { name: 'Salvar produto', exact: true })).toBeEnabled();
+  await saveProduct(page);
+  await expect(page.getByRole('status')).toContainText('criado');
+  const id = page.url().split('/').pop()!.split('?')[0]!;
+  try {
+    const [original] = (await pool.query('SELECT id, sku FROM variants WHERE product_id=$1', [id]))
+      .rows;
+    const photos = JSON.parse(await page.locator('input[name=mediaIds]').inputValue());
+    await page.getByLabel('Preço (R$)', { exact: true }).fill('125');
+    await page.getByRole('radio', { name: 'Um preço por foto', exact: true }).check();
+    const options = page.getByTestId('photo-option-editor');
+    await expect(options).toHaveCount(2);
+    await expect(options.first().getByLabel('Preço (R$)', { exact: true })).toHaveValue('125');
+    await options.nth(1).getByLabel('Preço (R$)', { exact: true }).fill('170');
+    await saveProduct(page);
+    await expect(page.getByRole('status')).toContainText('salvo');
+    let choices = (
+      await pool.query(
+        'SELECT id, sku, image_id, price_cents FROM variants WHERE product_id=$1 ORDER BY position',
+        [id]
+      )
+    ).rows;
+    expect(choices.map((option) => option.image_id)).toEqual(photos);
+    expect(choices[0].id).toBe(original.id);
+    expect(choices[0].sku).toBe(original.sku);
+    expect(choices[0].price_cents).toBe(12500);
+    expect(choices[1].price_cents).toBe(17000);
+    await options.nth(1).getByLabel('Preço (R$)', { exact: true }).fill('175');
+    await saveProduct(page);
+    await expect(page.getByRole('status')).toContainText('salvo');
+    const next = (
+      await pool.query(
+        'SELECT id, price_cents FROM variants WHERE product_id=$1 ORDER BY position',
+        [id]
+      )
+    ).rows;
+    expect(next.map((option) => option.id)).toEqual(choices.map((option) => option.id));
+    expect(next[1].price_cents).toBe(17500);
+    const bad = await page.request.post(`/admin/produtos/${id}`, {
+      form: {
+        name,
+        mode: 'standard',
+        price: '10',
+        showPrice: 'on',
+        publication: 'published',
+        mediaIds: JSON.stringify(photos)
+      },
+      headers: { origin: process.env.BASE_URL!, accept: 'text/html' },
+      maxRedirects: 0
+    });
+    expect(bad.status()).toBe(400);
+    expect(
+      (await pool.query('SELECT id FROM variants WHERE product_id=$1', [id])).rows
+    ).toHaveLength(2);
+  } finally {
+    await cleanupPhotoProduct(page, id);
+  }
+});

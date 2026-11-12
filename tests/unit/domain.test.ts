@@ -4,7 +4,9 @@ import {
   parseMoney,
   openingStatus,
   defaultHours,
-  buildWhatsAppMessage
+  buildWhatsAppMessage,
+  productOptionPath,
+  productPriceLabel
 } from '../../src/lib/domain';
 import { isAdminIdentity, authOptions } from '../../src/lib/server/auth-options';
 test('BRL uses integer cents and rejects ambiguous or malformed amounts', () => {
@@ -13,6 +15,43 @@ test('BRL uses integer cents and rejects ambiguous or malformed amounts', () => 
   assert.equal(parseMoney('0'), 0);
   assert.equal(parseMoney(''), null);
   for (const bad of ['-1', 'NaN', '1.234', '12,999', '1e3']) assert.throws(() => parseMoney(bad));
+});
+test('photo option links keep identity and price summaries never expose private prices', () => {
+  assert.equal(productOptionPath('orquideas', 'choice-2'), '/produtos/orquideas?opcao=choice-2');
+  const option = { priceCents: 12000, showPrice: true, availability: 'available' };
+  const product = {
+    mode: 'photo_variants',
+    variant: option,
+    variants: [option, { ...option, priceCents: 18000 }]
+  };
+  assert.match(productPriceLabel(product), /A partir de.*120,00/);
+  assert.doesNotMatch(
+    productPriceLabel({
+      ...product,
+      variants: [option, { ...option, showPrice: false, priceCents: 987654 }]
+    }),
+    /987|120/
+  );
+  assert.match(
+    productPriceLabel({
+      ...product,
+      variants: [option, { ...option, availability: 'unavailable', priceCents: 5000 }]
+    }),
+    /120,00/
+  );
+  const message = buildWhatsAppMessage({
+    productName: 'Orquídeas',
+    variantName: 'Orquídea branca',
+    sku: 'FC-OPCAO-2',
+    priceCents: 18000,
+    delivery: 'pickup',
+    card: false,
+    cardPriceCents: null,
+    productUrl: 'https://flora.test/produtos/orquideas?opcao=choice-2'
+  });
+  assert.match(message, /Opção: Orquídea branca/);
+  assert.match(message, /Referência: FC-OPCAO-2/);
+  assert.match(message, /\?opcao=choice-2/);
 });
 test('hours use São Paulo timezone with inclusive opening and exclusive closing', () => {
   assert.equal(openingStatus(defaultHours, new Date('2026-11-04T12:00:00Z')).open, true);

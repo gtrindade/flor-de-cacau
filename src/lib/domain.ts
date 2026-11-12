@@ -5,6 +5,27 @@ export const availabilityLabels = {
   unavailable: 'Indisponível'
 } as const;
 export type Availability = keyof typeof availabilityLabels;
+export type ProductMode = 'standard' | 'photo_variants';
+export function productOptionPath(slug: string, optionId?: string | null) {
+  return `/produtos/${encodeURIComponent(slug)}${optionId ? `?opcao=${encodeURIComponent(optionId)}` : ''}`;
+}
+export function productPriceLabel(product: {
+  mode: string;
+  variant: { priceCents: number | null };
+  variants: { priceCents: number | null; showPrice: boolean; availability: string }[];
+}) {
+  if (product.mode === 'standard')
+    return product.variant.priceCents === null
+      ? 'Consulte o valor'
+      : money(product.variant.priceCents);
+  const selectable = product.variants.filter((v) => v.availability !== 'unavailable');
+  const choices = selectable.length ? selectable : product.variants;
+  if (!choices.length || choices.some((v) => !v.showPrice || v.priceCents === null))
+    return 'Veja os valores por opção';
+  const prices = choices.map((v) => v.priceCents!);
+  const minimum = prices.reduce((minimum, price) => Math.min(minimum, price), Infinity);
+  return prices.every((p) => p === minimum) ? money(minimum) : `A partir de ${money(minimum)}`;
+}
 export const brazilianStates = [
   'AC',
   'AL',
@@ -109,6 +130,7 @@ export function openingStatus(hours: WeeklyHours, now: Date) {
 }
 export function buildWhatsAppMessage(input: {
   productName: string;
+  variantName?: string;
   sku: string;
   priceCents: number | null;
   date?: string;
@@ -129,10 +151,9 @@ export function buildWhatsAppMessage(input: {
   cardPriceCents: number | null;
   productUrl: string;
 }) {
-  const lines = [
-    `Olá, Flor de Cacau! Tenho interesse em ${input.productName}.`,
-    `Referência: ${input.sku}`
-  ];
+  const lines = [`Olá, Flor de Cacau! Tenho interesse em ${input.productName}.`];
+  if (input.variantName) lines.push(`Opção: ${input.variantName}`);
+  lines.push(`Referência: ${input.sku}`);
   if (input.priceCents !== null) lines.push(`Preço anunciado: ${money(input.priceCents)}`);
   else lines.push('Gostaria de consultar o preço.');
   const date = input.date ? input.date.split('-').reverse().join('/') : 'Ainda não sei';

@@ -11,8 +11,21 @@ export const load: PageServerLoad = async ({ url }) => {
   const term = clean(query);
   const products = (await getProducts()).filter(
     (p) =>
-      (!query || clean(p.name).includes(term) || clean(p.variant.sku).includes(term)) &&
+      (!query ||
+        clean(p.name).includes(term) ||
+        p.variants.some((variant) => clean(variant.sku).includes(term))) &&
       (!category || p.categories.some((c) => c.slug === category))
   );
-  return { products, categories: await getCategories(), query, category };
+  return {
+    products: products.map((product) => {
+      const match =
+        product.mode === 'photo_variants' && term
+          ? product.variants.find((variant) => clean(variant.sku) === term)
+          : undefined;
+      return { ...product, matchingOptionId: match?.id ?? null };
+    }),
+    categories: await getCategories(),
+    query,
+    category
+  };
 };

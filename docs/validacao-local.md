@@ -1,26 +1,30 @@
 # Validação da aplicação e implantação
 
-A suíte completa foi executada novamente em 8 de novembro de 2026, pelo snapshot de implantação `20261108T181357Z-50582`. O serviço do Raspberry foi conferido novamente em 8 de novembro de 2026 e continua saudável. A aplicação usa Node 24.22.2 e PostgreSQL 18; o Raspberry executa as imagens nativas ARM64.
+A suíte completa foi executada novamente em 12 de novembro de 2026, pelo snapshot de implantação `20261112T130852Z-64309`. A mesma release foi publicada no Raspberry e conferida por SSH e HTTPS público. A aplicação usa Node 24.22.2 e PostgreSQL 18; o Raspberry executa as imagens nativas ARM64.
 
-| Verificação                                             | Resultado                                         |
-| ------------------------------------------------------- | ------------------------------------------------- |
-| TypeScript e Svelte, incluindo scripts e testes         | 0 erros, 0 avisos                                 |
-| Build de produção com adapter-node                      | Aprovado no Mac e no Raspberry ARM64              |
-| Testes unitários de domínio, autorização e CLI          | 12 aprovados                                      |
-| Contratos Google OAuth e ID token com provedor simulado | 6 aprovados                                       |
-| E2E Chromium, Firefox, WebKit, Android e iPhone         | 120 aprovados, sem retries                        |
-| Testes dos scripts de implantação, incluindo HTTPS      | 10 aprovados                                       |
-| Reinício da aplicação no ambiente E2E                   | 5 rascunhos criados pela interface preservados    |
-| Limpeza do ambiente E2E                                 | Containers, rede e volumes descartáveis removidos |
-| Runtime Sharp no Raspberry                              | Conversão WebP executada em ARM64                 |
-| Atualização, rollback e reinício no Raspberry           | Conferidos por SSH; seis produtos preservados     |
-| Aplicação e PostgreSQL no Raspberry                     | Saudáveis                                         |
+| Verificação                                             | Resultado                                                                                    |
+| ------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| TypeScript e Svelte, incluindo scripts e testes         | 0 erros, 0 avisos                                                                            |
+| Build de produção com adapter-node                      | Aprovado no Mac e no Raspberry ARM64                                                         |
+| Testes unitários de domínio, autorização e CLI          | 13 aprovados                                                                                 |
+| Contratos Google OAuth e ID token com provedor simulado | 6 aprovados                                                                                  |
+| E2E Chromium, Firefox, WebKit, Android e iPhone         | 135 aprovados, sem retries                                                                   |
+| Testes dos scripts de implantação, incluindo HTTPS      | 10 aprovados                                                                                 |
+| Reinício da aplicação no ambiente E2E                   | 5 rascunhos criados pela interface preservados                                               |
+| Limpeza do ambiente E2E                                 | Containers, rede e volumes descartáveis removidos                                            |
+| Runtime Sharp no Raspberry                              | Conversão WebP executada em ARM64                                                            |
+| Atualização no Raspberry                                | Sete produtos, sete variações e 22 mídias preservados; hashes dos dados anteriores idênticos |
+| Aplicação e PostgreSQL no Raspberry                     | Saudáveis                                                                                    |
 
-A execução completa usou `./deploy.sh update`, que chama `scripts/test-e2e.sh` sobre um snapshot imutável. Os 120 cenários Playwright concluíram em aproximadamente 6,9 minutos, além de build, preparação, testes unitários/integração e verificação após reinício. Os testes de implantação usam `python3 -m unittest discover -s tests/deploy -p 'test_*.py'`.
+A execução completa usou `./deploy.sh update`, que chama `scripts/test-e2e.sh` sobre um snapshot imutável. Os 135 cenários Playwright concluíram em aproximadamente 8,5 minutos, além de build, preparação, testes unitários/integração e verificação após reinício. Os testes de implantação usam `python3 -m unittest discover -s tests/deploy -p 'test_*.py'`.
 
 O relatório HTML está em `.e2e/artifacts/report/index.html`; screenshots em `.e2e/artifacts/results`; logs dos serviços em `.e2e/artifacts/services.log`; saída da execução em `.e2e/artifacts/execution.log`. Esses artefatos são locais e ignorados pelo Git. Os registros da primeira atualização, rollback e reinício do Raspberry estão em `.local/deploy-logs`.
 
 Foram exercitados catálogo, busca por nome/referência e filtros, preços privados, 404, pedidos e cartões, endereço completo, aviso de horário, validação de entrada, autorização, CRUD de produtos e categorias, uploads reais com reenvio, ordenação e remoção, formatação da biografia, configurações e saída da sessão. Os testes também rejeitam erros JavaScript inesperados na página. A busca preserva texto digitado antes da hidratação.
+
+O modo de preço por foto foi exercitado nos cinco perfis com dez imagens: preenchimento durante o upload, fila de duas requisições, conclusão fora da ordem de seleção, preços e referências próprios, conversão de galeria preservando a referência original e edição/reordenação mantendo os IDs. Os cenários verificam o link direto e a mensagem da opção escolhida, busca pela referência exata, preço oculto, opção indisponível, exclusão com 404 e rejeição de vínculos de outra opção/produto sem salvar alterações parciais. Android e iPhone também conferem o editor em 320 px com texto ampliado em 200%. Screenshots `editor-preco-por-foto.png` e `opcoes-por-foto.png` registram a revisão visual.
+
+A primeira execução encontrou uma limitação de `route.fetch` ao reproduzir uploads multipart no WebKit: os arquivos eram reenviados vazios pela interceptação. O teste passou a atrasar e encaminhar a requisição nativa, preservando os bytes das fotos. Safari, Android e iPhone passaram no cenário isolado e a execução completa seguinte aprovou os 135 cenários. A execução reprovada não foi enviada ao servidor.
 
 Todos os caminhos para WhatsApp foram conferidos em nova aba, preservando a aba original: pedido, cabeçalho, rodapé e links da biografia. A suíte cobre o link manual quando o navegador bloqueia a abertura automática, fechamento da aba temporária após erro e preservação dos campos para tentar novamente. As navegações ao WhatsApp são interceptadas; nenhuma mensagem real é enviada pelos testes.
 
@@ -28,7 +32,9 @@ O formulário de entrega coleta CEP, rua/avenida, número, bairro, cidade e UF, 
 
 A prévia no Raspberry está em `https://flordecacau.ddns.net`, com certificado Let's Encrypt válido e redirecionamento HTTP para HTTPS. Saúde, páginas públicas e busca por `FC-LOJA-002` foram conferidas por HTTPS público com a validação normal de certificados. Uma solicitação gerou o redirecionamento 303 do SvelteKit, sem seguir o link ao WhatsApp; a mensagem contém a referência e o link HTTPS do produto. Uma origem estrangeira foi rejeitada com HTTP 403. O certificado emitido corresponde ao hostname e vence em 6 de fevereiro de 2027; o Caddy mantém a renovação automática. `/admin` sem sessão retorna 303 para `/entrar`.
 
-A release ativa conferida no servidor é `20261108T181357Z-50582`, publicada após a aprovação dos 120 E2E. A anterior é `20261108T150421Z-48257`. Uma atualização real, dois rollbacks e reinício foram executados por SSH. Os seis produtos demonstrativos persistiram, a configuração privada mantém permissão 600 e o PostgreSQL não publica porta no host. O Docker está habilitado no boot e os containers usam `restart: unless-stopped`; não foi necessário reiniciar fisicamente o Raspberry. Foundry VTT permanece na porta 30000.
+A release ativa conferida no servidor é `20261112T130852Z-64309`, publicada após a aprovação dos 135 E2E. A anterior é `20261108T181357Z-50582`. A migration aditiva `0001_photo_variants` foi aplicada, mantendo os sete produtos existentes em preço único. Contagens e hashes dos dados anteriores à migration foram comparados antes/depois: sete produtos, sete variações e 22 mídias idênticos, desconsiderando somente as novas colunas. O seed não sobrescreveu conteúdo. Saúde e catálogo retornaram 200 por HTTPS, a busca por referência funcionou, `/admin` anônimo redirecionou para login e produto inexistente retornou 404.
+
+Atualização, rollback e reinício anteriores foram conferidos em 8 de novembro. A configuração privada mantém permissão 600 e o PostgreSQL não publica porta no host. O Docker está habilitado no boot e os containers usam `restart: unless-stopped`; não foi necessário reiniciar fisicamente o Raspberry. Foundry VTT permanece na porta 30000. Depois de usar o modo por foto, uma recuperação deve escolher release que entenda esse modo, conforme [deploy/README.md](../deploy/README.md).
 
 Os produtos da prévia usam fotos da própria loja e valores/disponibilidade fictícios, identificados na interface. As imagens ilustrativas da página inicial e as fixtures E2E continuam separadas. O ambiente local no Mac preserva seus 12 produtos.
 

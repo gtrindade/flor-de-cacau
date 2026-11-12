@@ -17,6 +17,8 @@ A prévia instalada no Raspberry está em [https://flordecacau.ddns.net](https:/
 
 Uma falha no build preserva a aplicação anterior. Uma falha ao iniciar a nova aplicação tenta restaurar a imagem anterior. `rollback` troca a imagem da aplicação; migrations já aplicadas continuam no banco. Mudanças de schema devem ser compatíveis com a versão anterior.
 
+A migration `0001_photo_variants` preserva os produtos existentes como galerias de preço único. Depois de cadastrar ou converter produtos para preço por foto, use apenas releases com suporte a esse modo para recuperação: versões anteriores à migration exibem somente a primeira variação e não entendem os links das opções. A migration não deve ser desfeita para recuperar a aplicação.
+
 ## Primeira instalação
 
 Requer Debian 13 ARM64, SSH por chave, rsync e Docker Engine/Compose. O instalador revisável [bootstrap-server.sh](bootstrap-server.sh) configura o repositório oficial do Docker, inicia o daemon no boot e associa o usuário ao grupo Docker. Esse grupo permite controle administrativo do daemon. Para preparar um servidor novo, envie o instalador e execute-o uma vez:

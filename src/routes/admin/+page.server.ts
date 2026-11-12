@@ -18,9 +18,12 @@ export const actions: Actions = {
     const publication = form.get('publication');
     if (publication !== 'hidden' && publication !== 'published')
       return fail(400, { error: 'Escolha uma opção válida.' });
-    const [variant] = await db.select().from(variants).where(eq(variants.productId, id));
-    if (!variant) return fail(404, { error: 'Produto não encontrado.' });
-    if (publication === 'published' && variant.showPrice && variant.priceCents === null)
+    const options = await db.select().from(variants).where(eq(variants.productId, id));
+    if (!options.length) return fail(404, { error: 'Produto não encontrado.' });
+    if (
+      publication === 'published' &&
+      options.some((variant) => variant.showPrice && variant.priceCents === null)
+    )
       return fail(400, { error: 'Edite o produto para informar o preço antes de publicar.' });
     await db
       .update(products)

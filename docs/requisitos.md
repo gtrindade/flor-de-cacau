@@ -43,7 +43,10 @@ Criar um catálogo público da Floricultura Flor de Cacau, em Sabará, com admin
 ### Produtos e variações
 
 - Modelar a relação Produto → Variações como um para muitos.
-- A primeira versão cria e administra uma única variação padrão por produto, sem seletor de opções para o cliente.
+- Dois modos por produto: galeria com um preço único, ou uma opção por foto com preço próprio. O modo por foto aceita seleção em lote sem limite de quantidade; o limite de 15 MB continua valendo por imagem.
+- Ao selecionar fotos no segundo modo, apresentar imediatamente campos de preço associados a cada prévia, preservando essa associação mesmo quando os uploads terminarem fora de ordem. Disponibilidade, exibição do preço, nome e referência são editáveis por opção.
+- Cada opção tem identificação estável. Reordenar fotos ou editar preços não altera referências nem links já enviados. Converter uma galeria existente preserva sua referência na primeira opção.
+- O catálogo mostra um único produto e, ao abri-lo, permite escolher a foto/opção. O link direto identifica a opção por `?opcao=<id>`. Uma opção removida ou pertencente a outro produto retorna 404.
 - Produto concentra nome, descrição, categorias, fotos, URL e visibilidade.
 - Variação concentra referência, nome da opção, preço, exibição do preço e disponibilidade.
 - Preparar evolução para opções como buquês de 6, 12 ou 24 rosas, com valores próprios.
@@ -68,7 +71,7 @@ Criar um catálogo público da Floricultura Flor de Cacau, em Sabará, com admin
 - Informações previstas: produto e referência, data desejada ou “Ainda não sei”, período/horário ou “A combinar”, retirada ou entrega e observação opcional.
 - Para entrega, coletar CEP, rua/avenida, número (aceitando “s/n”), bairro, cidade e UF. Complemento e ponto de referência são opcionais. Os campos aparecem apenas para entrega, preservam os valores ao alternar a modalidade e são validados no servidor. A mensagem do WhatsApp inclui o endereço completo; retirada não inclui endereço.
 - Todos os links e solicitações abrem o WhatsApp em nova aba, preservando a aba do site. A mensagem vem preenchida e o cliente ainda precisa enviá-la. Se o navegador bloquear a abertura automática, oferecer um link manual para a conversa validada, também em nova aba.
-- A mensagem inclui a referência da variação e o preço público quando houver.
+- A mensagem inclui a referência da variação e o preço público quando houver. No modo por foto, inclui também o nome da opção e um link direto para ela.
 - A busca do catálogo aceita nome e referência da variação (SKU), sem diferenciar maiúsculas de minúsculas, mantendo o filtro por categoria e a visibilidade pública dos produtos.
 - Data e horário são preferências, sujeitos a confirmação na conversa.
 - Datas e horários de atendimento usam o fuso da floricultura, em Sabará, independentemente do fuso do servidor ou do visitante.
@@ -166,7 +169,7 @@ Consultas por SSH, somente leitura, realizadas nesta conversa; arquitetura, disc
 - Avaliar outros provedores de login, como Facebook. Google é o único escolhido para a primeira versão.
 - Upload, tratamento e exibição de vídeos.
 - Importação dos horários do Google Maps/Perfil da Empresa.
-- Interface para múltiplas variações de um mesmo produto.
+- Variações sem associação individual a uma foto e combinações de atributos como tamanho e cor.
 
 ## Pontos ainda abertos
 

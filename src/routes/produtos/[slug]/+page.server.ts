@@ -1,12 +1,21 @@
-import { fail, redirect } from '@sveltejs/kit';
+import { error, fail, redirect } from '@sveltejs/kit';
 import { z } from 'zod';
 import { getProduct, getSettings } from '#lib/server/catalog';
-import { brazilianStates, buildWhatsAppMessage } from '#lib/domain';
+import { brazilianStates, buildWhatsAppMessage, productOptionPath } from '#lib/domain';
 import type { Actions, PageServerLoad } from './$types';
-export const load: PageServerLoad = async ({ params, url }) => ({
-  product: await getProduct(params.slug),
-  canonicalURL: `${url.origin}/produtos/${params.slug}`
-});
+export const load: PageServerLoad = async ({ params, url }) => {
+  const product = await getProduct(params.slug);
+  const optionId = url.searchParams.get('opcao');
+  const selectedVariant = optionId
+    ? product.variants.find((variant) => variant.id === optionId)
+    : null;
+  if (optionId && !selectedVariant) error(404, 'Opção não encontrada.');
+  return {
+    product,
+    selectedVariant,
+    canonicalURL: `${url.origin}${productOptionPath(product.slug, product.mode === 'photo_variants' ? selectedVariant?.id : null)}`
+  };
+};
 const requestSchema = z.object({
   date: z.string().max(10),
   period: z.enum(['combinar', 'manha', 'tarde', 'horario']),
@@ -26,11 +35,18 @@ const requestSchema = z.object({
 export const actions: Actions = {
   solicitar: async ({ request, params, url }) => {
     const product = await getProduct(params.slug);
-    if (product.variant.availability === 'unavailable') {
+    const input = await request.formData();
+    const variantId = String(input.get('variantId') ?? '');
+    const variant = variantId
+      ? product.variants.find((option) => option.id === variantId)
+      : product.mode === 'standard'
+        ? product.variant
+        : null;
+    if (!variant) return fail(400, { error: 'Escolha uma opção válida deste produto.' });
+    if (variant.availability === 'unavailable') {
       return fail(409, { error: 'Este produto está indisponível no momento.' });
     }
     const settings = await getSettings();
-    const input = await request.formData();
     const values = Object.fromEntries(
       [
         'date',
@@ -91,11 +107,12 @@ export const actions: Actions = {
     const message = buildWhatsAppMessage({
       ...data,
       productName: product.name,
-      sku: product.variant.sku,
-      priceCents: product.variant.priceCents,
+      variantName: product.mode === 'photo_variants' ? variant.name : undefined,
+      sku: variant.sku,
+      priceCents: variant.priceCents,
       card,
       cardPriceCents: settings.cardPriceCents,
-      productUrl: `${url.origin}/produtos/${product.slug}`
+      productUrl: `${url.origin}${productOptionPath(product.slug, product.mode === 'photo_variants' ? variant.id : null)}`
     });
     redirect(303, `https://wa.me/${settings.whatsapp}?text=${encodeURIComponent(message)}`, {
       external: ['https://wa.me']

@@ -5,7 +5,7 @@
   import EyeOff from '@lucide/svelte/icons/eye-off';
   import Eye from '@lucide/svelte/icons/eye';
   import Trash2 from '@lucide/svelte/icons/trash-2';
-  import { money, availabilityLabels, type Availability } from '#lib/domain';
+  import { money, productPriceLabel, availabilityLabels, type Availability } from '#lib/domain';
   import type { PageProps } from './$types';
   let { data, form }: PageProps = $props();
   let deleting = $state<string | null>(null);
@@ -42,12 +42,16 @@
         >
         <h2>{product.name}</h2>
         <p>
-          {product.variant.priceCents !== null
-            ? money(product.variant.priceCents)
-            : 'Sem preço'}{!product.variant.showPrice ? ' · Preço oculto' : ''}
+          {#if product.mode === 'photo_variants'}{product.variants.length} opções · {productPriceLabel(
+              product
+            )}{:else}{product.variant.priceCents !== null
+              ? money(product.variant.priceCents)
+              : 'Sem preço'}{!product.variant.showPrice ? ' · Preço oculto' : ''}{/if}
         </p>
         <span class="field-hint"
-          >{availabilityLabels[product.variant.availability as Availability]}</span
+          >{product.mode === 'photo_variants'
+            ? 'Preço e disponibilidade por opção'
+            : availabilityLabels[product.variant.availability as Availability]}</span
         >
       </div>
       <div class="admin-product-actions">

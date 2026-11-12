@@ -6,13 +6,15 @@
   import Info from '@lucide/svelte/icons/info';
   import * as Dialog from '#lib/components/ui/dialog';
   import { brazilianStates, money } from '#lib/domain';
-  import type { Product, Settings } from '#lib/server/catalog';
+  import type { Product, ProductVariant, Settings } from '#lib/server/catalog';
   let {
     product,
+    variant = product.variant,
     settings,
     form
   }: {
     product: Product;
+    variant?: ProductVariant;
     settings: Settings;
     form?: { error?: string; values?: Record<string, string> } | null;
   } = $props();
@@ -44,21 +46,24 @@
 
 <Dialog.Root bind:open
   ><Dialog.Trigger class="button button-green order-trigger"
-    ><WhatsAppIcon />{product.variant.availability === 'check'
+    ><WhatsAppIcon />{variant.availability === 'check'
       ? 'Consultar disponibilidade'
       : 'Pedir via WhatsApp'}<ArrowRight size={17} /></Dialog.Trigger
   ><Dialog.Content class="order-dialog"
     ><Dialog.Header
       ><p class="eyebrow">VAMOS COMBINAR OS DETALHES</p>
       <Dialog.Title>Seu pedido começa aqui.</Dialog.Title><Dialog.Description
-        >{product.name} · {product.variant.priceCents !== null
-          ? money(product.variant.priceCents)
+        >{product.name}{product.mode === 'photo_variants' ? ` · ${variant.name}` : ''} · {variant.priceCents !==
+        null
+          ? money(variant.priceCents)
           : 'Preço sob consulta'}</Dialog.Description
       ></Dialog.Header
     >
     <form
       method="POST"
-      action="?/solicitar"
+      action={product.mode === 'photo_variants'
+        ? `?/solicitar&opcao=${encodeURIComponent(variant.id)}`
+        : '?/solicitar'}
       target="_blank"
       rel="noopener noreferrer"
       oninput={() => (whatsappUrl = '')}
@@ -104,6 +109,7 @@
       }}
       class="order-form"
     >
+      <input type="hidden" name="variantId" value={variant.id} />
       {#if requestError}<p class="form-error" role="alert">{requestError}</p>{/if}
       {#if !settings.opening.open}<div class="notice">
           <Info size={18} />
@@ -264,11 +270,11 @@
               maxlength="300"
               rows="3"
               placeholder="Escreva seu carinho em palavras…"
-              bind:value={fields.cardMessage}></textarea>{#if product.variant.priceCents !== null}<p
+              bind:value={fields.cardMessage}></textarea>{#if variant.priceCents !== null}<p
                 class="subtotal"
               >
                 Subtotal estimado <strong
-                  >{money(product.variant.priceCents + (settings.cardPriceCents ?? 0))}</strong
+                  >{money(variant.priceCents + (settings.cardPriceCents ?? 0))}</strong
                 >
               </p>{/if}{/if}
         </fieldset>{/if}
