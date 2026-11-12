@@ -142,6 +142,8 @@ Fotos aceitam JPEG, PNG, WebP e HEIC/HEIF, até 15 MB, com limite de pixels no p
 
 No navegador, cada arquivo é lido para uma cópia independente antes do envio sequencial. A seleção nativa permanece associada às fotos que ainda aguardam leitura; adicionar outro lote não limpa a seleção anterior. Em falha de conexão ou timeout, a fila pausa e “Tentar novamente” reutiliza a cópia, mantendo fotos e preços. Remover a foto que causou a pausa também libera a fila. Erros de formato/preço não apagam os demais campos. Esse cuidado reduz a dependência de arquivos temporários de seletores mobile; há relatos dessa classe de falha no [rastreador do Chromium](https://issues.chromium.org/issues/40123366). A validação em um aparelho físico continua necessária.
 
+A preparação das fotos independe da velocidade de envio: um leitor prepara cópias antecipadamente, com limite de 32 MB de arquivos preparados na fila, enquanto um upload segue por vez. Prévias são criadas somente das cópias completas, evitando uma segunda leitura concorrente do arquivo nativo. A leitura tenta até três vezes em falhas temporárias. Se continuar ilegível, **Selecionar foto novamente** abre o seletor no próprio item e mantém posição, preço e identificação; repetir a requisição de rede não resolve um arquivo que o navegador não consegue mais ler. A página rola até a primeira foto de cada novo lote, respeitando a preferência de movimento reduzido.
+
 Os resultados conferidos e os limites dessa validação estão em [docs/validacao-local.md](docs/validacao-local.md).
 
 A escala de tipografia do celular, referências de e-commerce consultadas e verificações de ampliação estão em [docs/tipografia-mobile.md](docs/tipografia-mobile.md).

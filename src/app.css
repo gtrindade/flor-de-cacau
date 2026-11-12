@@ -2416,6 +2416,7 @@ label:has(input:disabled) {
 }
 .upload-item {
   min-width: 0;
+  scroll-margin-top: 1rem;
 }
 .upload-grid.upload-option-list {
   grid-template-columns: minmax(0, 1fr);

@@ -45,6 +45,7 @@ Criar um catálogo público da Floricultura Flor de Cacau, em Sabará, com admin
 - Modelar a relação Produto → Variações como um para muitos.
 - Dois modos por produto: galeria com um preço único, ou uma opção por foto com preço próprio. O modo por foto aceita seleção em lote sem limite de quantidade; o limite de 15 MB continua valendo por imagem.
 - Ao selecionar fotos no segundo modo, apresentar imediatamente campos de preço associados a cada prévia, preservando essa associação ao longo da fila. Enviar uma foto por vez. Falhas de conexão pausam a fila, e uma nova tentativa mantém os preços e as fotos já escolhidas. É possível adicionar mais fotos ou remover alguma antes de salvar/publicar. Disponibilidade, exibição do preço, nome e referência são editáveis por opção.
+- Ao adicionar fotos, rolar a página até a primeira foto do novo lote, inclusive quando já houver fotos anteriores. Respeitar movimento reduzido. Falhas de leitura oferecem nova seleção no mesmo item, preservando preço, posição e identificação; a recuperação não deve exigir excluir o lote inteiro.
 - Cada opção tem identificação estável. Reordenar fotos ou editar preços não altera referências nem links já enviados. Converter uma galeria existente preserva sua referência na primeira opção.
 - O catálogo mostra um único produto e, ao abri-lo, permite escolher a foto/opção. O link direto identifica a opção por `?opcao=<id>`. Uma opção removida ou pertencente a outro produto retorna 404.
 - Produto concentra nome, descrição, categorias, fotos, URL e visibilidade.

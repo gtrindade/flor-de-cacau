@@ -1264,6 +1264,7 @@ test('onze fotos: falha de conexão pausa a fila, repetir funciona e permite nov
   page
 }, info) => {
   test.setTimeout(120_000);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await login(page);
   await page.goto('/admin/produtos/novo');
   await page.getByRole('radio', { name: 'Um preço por foto', exact: true }).check();
@@ -1299,19 +1300,17 @@ test('onze fotos: falha de conexão pausa a fila, repetir funciona e permite nov
     await selectPhotos(page, images.slice(0, 11));
     const rows = page.getByTestId('photo-option-editor');
     await expect(rows).toHaveCount(11);
+    await expect
+      .poll(() =>
+        rows.first().evaluate((element) => Math.round(element.getBoundingClientRect().top))
+      )
+      .toBe(16);
     for (let i = 0; i < 11; i++)
       await rows
         .nth(i)
         .getByLabel('Preço (R$)', { exact: true })
         .fill(String(100 + i));
     await expect.poll(() => attempts).toBe(1);
-    expect(
-      await page
-        .locator('input[type=file]')
-        .evaluateAll((inputs) =>
-          inputs.some((input) => (input as HTMLInputElement).files?.length === 11)
-        )
-    ).toBe(true);
     release();
     await expect(rows.nth(2).getByRole('alert')).toContainText('Falha de conexão');
     await expect(rows.nth(3)).toContainText('Aguardando nova tentativa');
@@ -1320,6 +1319,11 @@ test('onze fotos: falha de conexão pausa a fila, repetir funciona e permite nov
     await expect(page.getByRole('button', { name: 'Salvar produto', exact: true })).toBeDisabled();
     await selectPhotos(page, images.slice(11));
     await expect(rows).toHaveCount(13);
+    await expect
+      .poll(() =>
+        rows.nth(11).evaluate((element) => Math.round(element.getBoundingClientRect().top))
+      )
+      .toBe(16);
     await rows.nth(11).getByLabel('Preço (R$)', { exact: true }).fill('111');
     await rows.nth(12).getByLabel('Preço (R$)', { exact: true }).fill('112');
     await rows.nth(4).getByRole('button', { name: 'Cancelar envio', exact: true }).click();
@@ -1347,6 +1351,105 @@ test('onze fotos: falha de conexão pausa a fila, repetir funciona e permite nov
     ).toBe(12);
   } finally {
     release();
+    if (productId) await cleanupPhotoProduct(page, productId);
+  }
+});
+
+test('nove fotos: leitura temporária recupera e nova seleção substitui falhas sem perder preços', async ({
+  page
+}, info) => {
+  test.setTimeout(120_000);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.addInitScript(() => {
+    const original = FileReader.prototype.readAsArrayBuffer;
+    const sources = new Map<string, Blob>();
+    const attempts = new Map<Blob, number>();
+    FileReader.prototype.readAsArrayBuffer = function (blob: Blob) {
+      if (blob instanceof File && /^leitura-[1-9]\.webp$/.test(blob.name)) {
+        if (!sources.has(blob.name)) sources.set(blob.name, blob);
+        const count = (attempts.get(blob) ?? 0) + 1;
+        attempts.set(blob, count);
+        const index = Number(blob.name.match(/\d+/)![0]);
+        if (
+          (index === 1 && count < 3) ||
+          (index >= 3 && index <= 8 && sources.get(blob.name) === blob)
+        )
+          throw new DOMException('Temporary native photo access failure', 'NotReadableError');
+      }
+      return original.call(this, blob);
+    };
+  });
+  await login(page);
+  await page.goto('/admin/produtos/novo');
+  await page.getByRole('radio', { name: 'Um preço por foto', exact: true }).check();
+  await page
+    .getByLabel('Nome do produto', { exact: true })
+    .fill(`Leitura celular ${info.project.name}`);
+  const { readFile } = await import('node:fs/promises');
+  const buffer = await readFile('static/demo-loja/orquidea-branca.webp');
+  const files = Array.from({ length: 9 }, (_, i) => ({
+    name: `leitura-${i + 1}.webp`,
+    mimeType: 'image/webp',
+    buffer
+  }));
+  let productId = '';
+  try {
+    await selectPhotos(page, files);
+    const rows = page.getByTestId('photo-option-editor');
+    await expect(rows).toHaveCount(9);
+    await expect
+      .poll(() =>
+        rows.first().evaluate((element) => Math.round(element.getBoundingClientRect().top))
+      )
+      .toBe(16);
+    for (let i = 0; i < 9; i++)
+      await rows
+        .nth(i)
+        .getByLabel('Preço (R$)', { exact: true })
+        .fill(String(100 + i));
+    await expect(page.getByRole('alert')).toHaveCount(6);
+    await expect
+      .poll(async () => JSON.parse(await page.locator('input[name=mediaIds]').inputValue()).length)
+      .toBe(3);
+    const existing = JSON.parse(await page.locator('input[name=mediaIds]').inputValue());
+    await expect(rows.first().getByRole('alert')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Salvar produto', exact: true })).toBeDisabled();
+      await rows.nth(2).screenshot({ path: info.outputPath('fotos-reselecionar.png') });
+    for (let i = 2; i <= 7; i++) {
+      const row = rows.nth(i);
+      await expect(row.getByRole('button', { name: 'Tentar novamente', exact: true })).toHaveCount(
+        0
+      );
+      await expect(row.getByLabel('Preço (R$)', { exact: true })).toHaveValue(String(100 + i));
+      const chooser = page.waitForEvent('filechooser');
+      await row.getByRole('button', { name: 'Selecionar foto novamente', exact: true }).click();
+      await (await chooser).setFiles(files[i]!);
+      await expect(row.getByRole('alert')).toHaveCount(0);
+      await expect(row.getByLabel('Preço (R$)', { exact: true })).toHaveValue(String(100 + i));
+      await expect(rows).toHaveCount(9);
+    }
+    await expect(page.getByRole('button', { name: 'Salvar produto', exact: true })).toBeEnabled({
+      timeout: 30_000
+    });
+    const completed = JSON.parse(await page.locator('input[name=mediaIds]').inputValue());
+    expect(completed).toHaveLength(9);
+    expect(new Set(completed).size).toBe(9);
+    expect(completed[0]).toBe(existing[0]);
+    expect(completed[1]).toBe(existing[1]);
+    expect(completed[8]).toBe(existing[2]);
+    if (info.project.use.hasTouch) await expectReadableMobile(page);
+    await saveProduct(page);
+    await expect(page.getByRole('status')).toContainText('criado');
+    productId = page.url().split('/').pop()!.split('?')[0]!;
+    const variants = (
+      await pool.query('SELECT price_cents FROM variants WHERE product_id=$1 ORDER BY position', [
+        productId
+      ])
+    ).rows;
+    expect(variants.map((variant) => variant.price_cents)).toEqual(
+      Array.from({ length: 9 }, (_, i) => (100 + i) * 100)
+    );
+  } finally {
     if (productId) await cleanupPhotoProduct(page, productId);
   }
 });
