@@ -8,6 +8,9 @@
     progress?: number;
     error?: string;
     xhr?: XMLHttpRequest;
+    preparing?: boolean;
+    prepared?: boolean;
+    pickerId?: number;
   };
 </script>
 
@@ -37,10 +40,12 @@
     details?: Snippet<[UploadPhoto, number]>;
   } = $props();
   let ready = $state(false);
-  let input: HTMLInputElement;
+  let pickerCounter = $state(0);
+  let pickers = $state([0]);
   let error = $state('');
   let uploadCounter = 0;
   let activeUploads = 0;
+  let pausedPhotoKey = $state<string | null>(null);
   let destroyed = false;
   onMount(() => {
     ready = true;
@@ -49,61 +54,99 @@
     busy = photos.some((photo) => !photo.id || !!photo.error);
   });
   function pump() {
-    if (destroyed) return;
-    for (const photo of photos) {
-      if (activeUploads >= 2) break;
-      if (photo.file && !photo.id && !photo.xhr && !photo.error) send(photo);
+    if (destroyed || activeUploads || pausedPhotoKey) return;
+    const next = photos.find((photo) => photo.file && !photo.id && !photo.error);
+    if (next) void send(next);
+  }
+  function releasePickers() {
+    // Keep each native selection attached until its files have independent byte copies.
+    // Selecting another batch must not clear files still waiting in the upload queue.
+    pickers = pickers.filter(
+      (picker) =>
+        picker === pickerCounter ||
+        photos.some((photo) => photo.pickerId === picker && photo.file && !photo.prepared)
+    );
+  }
+  async function send(photo: UploadPhoto) {
+    if (!photo.file) return;
+    activeUploads++;
+    photo.preparing = true;
+    photo.progress = 0;
+    try {
+      if (!photo.prepared) {
+        const original = photo.file;
+        const bytes = await original.arrayBuffer();
+        if (destroyed || !photos.includes(photo)) return;
+        if (!bytes.byteLength) throw new Error('Empty photo');
+        photo.file = new File([bytes], original.name, {
+          type: original.type,
+          lastModified: original.lastModified
+        });
+        photo.prepared = true;
+        const preview = photo.url;
+        photo.url = URL.createObjectURL(photo.file);
+        URL.revokeObjectURL(preview);
+        releasePickers();
+      }
+      photo.preparing = false;
+      await transmit(photo);
+    } catch {
+      if (!destroyed && photos.includes(photo))
+        photo.error = 'Não conseguimos ler esta foto. Selecione-a novamente no celular.';
+    } finally {
+      photo.preparing = false;
+      photo.xhr = undefined;
+      activeUploads--;
+      pump();
     }
   }
-  function send(photo: UploadPhoto) {
-    if (!photo.file) return;
-    photo.progress = 0;
-    const data = new FormData();
-    data.set('file', photo.file);
-    const xhr = new XMLHttpRequest();
-    photo.xhr = xhr;
-    activeUploads++;
-    let settled = false;
-    const complete = () => {
-      if (settled) return;
-      settled = true;
-      activeUploads--;
-      photo.xhr = undefined;
-      pump();
-    };
-    xhr.open('POST', '/admin/upload');
-    xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable) photo.progress = Math.round((event.loaded / event.total) * 100);
-    };
-    xhr.onload = () => {
-      let result;
-      try {
-        result = JSON.parse(xhr.responseText);
-      } catch {
-        result = { error: 'Resposta inesperada. Tente novamente.' };
-      }
-      if (
-        xhr.status >= 200 &&
-        xhr.status < 300 &&
-        typeof result.id === 'string' &&
-        typeof result.url === 'string'
-      ) {
-        const preview = photo.url;
-        photo.id = result.id;
-        photo.url = result.url;
-        photo.file = undefined;
-        URL.revokeObjectURL(preview);
-      } else photo.error = result.error || 'Não foi possível enviar esta foto.';
-      complete();
-    };
-    xhr.onerror = () => {
-      photo.error = 'Falha de conexão. Toque para tentar novamente.';
-      complete();
-    };
-    xhr.onabort = complete;
-    xhr.send(data);
+  function transmit(photo: UploadPhoto) {
+    return new Promise<void>((resolve) => {
+      const data = new FormData();
+      data.set('file', photo.file!);
+      const xhr = new XMLHttpRequest();
+      photo.xhr = xhr;
+      xhr.open('POST', '/admin/upload');
+      xhr.timeout = 120_000;
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) photo.progress = Math.round((event.loaded / event.total) * 100);
+      };
+      xhr.onload = () => {
+        let result;
+        try {
+          result = JSON.parse(xhr.responseText);
+        } catch {
+          result = { error: 'Resposta inesperada. Tente novamente.' };
+        }
+        if (
+          xhr.status >= 200 &&
+          xhr.status < 300 &&
+          typeof result?.id === 'string' &&
+          typeof result?.url === 'string'
+        ) {
+          const preview = photo.url;
+          photo.id = result.id;
+          photo.url = result.url;
+          photo.file = undefined;
+          URL.revokeObjectURL(preview);
+        } else photo.error = result?.error || 'Não foi possível enviar esta foto.';
+        resolve();
+      };
+      xhr.onerror = () => {
+        photo.error = 'Falha de conexão. Toque para tentar novamente.';
+        pausedPhotoKey = photo.key;
+        resolve();
+      };
+      xhr.ontimeout = () => {
+        photo.error = 'O envio demorou demais. Confira a conexão e tente novamente.';
+        pausedPhotoKey = photo.key;
+        resolve();
+      };
+      xhr.onabort = () => resolve();
+      xhr.send(data);
+    });
   }
-  function add(event: Event) {
+  function add(event: Event, pickerId: number) {
     const files = Array.from((event.target as HTMLInputElement).files ?? []);
     error = '';
     for (const file of files) {
@@ -119,11 +162,14 @@
         key: `upload-${++uploadCounter}`,
         id: '',
         file,
+        pickerId,
         url: URL.createObjectURL(file),
         progress: 0
       });
     }
-    input.value = '';
+    // A fresh input allows more batches (including the same photo) without invalidating this one.
+    pickers.push(++pickerCounter);
+    releasePickers();
     pump();
   }
   function move(index: number, offset: number) {
@@ -135,10 +181,13 @@
     photos = photos.filter((item) => item.key !== photo.key);
     photo.xhr?.abort();
     if (photo.file) URL.revokeObjectURL(photo.url);
+    if (pausedPhotoKey === photo.key) pausedPhotoKey = null;
+    releasePickers();
     pump();
   }
   function retry(photo: UploadPhoto) {
     photo.error = undefined;
+    if (pausedPhotoKey === photo.key) pausedPhotoKey = null;
     pump();
   }
   onDestroy(() => {
@@ -156,19 +205,22 @@
   value={JSON.stringify(photos.filter((photo) => photo.id).map((photo) => photo.id))}
 />
 <div class="upload-area">
-  <label class="upload-label">
-    <Upload size={25} strokeWidth={1.3} /><strong>Escolher fotos</strong>
-    <span>Do celular ou computador · até 15 MB por foto</span>
-    <input
-      bind:this={input}
-      type="file"
-      accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif"
-      multiple={max === null || max > 1}
-      onchange={add}
-      aria-label="Escolher fotos"
-      disabled={!ready || (max !== null && photos.length >= max)}
-    />
-  </label>
+  {#each pickers as picker (picker)}
+    <label class="upload-label" style={picker === pickerCounter ? undefined : 'display: none'}>
+      {#if picker === pickerCounter}
+        <Upload size={25} strokeWidth={1.3} /><strong>Escolher fotos</strong>
+        <span>Do celular ou computador · até 15 MB por foto</span>
+      {/if}
+      <input
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif"
+        multiple={max === null || max > 1}
+        onchange={(event) => add(event, picker)}
+        aria-label={picker === pickerCounter ? 'Escolher fotos' : undefined}
+        disabled={!ready || (max !== null && photos.length >= max)}
+      />
+    </label>
+  {/each}
 </div>
 {#if error}<p class="form-error" role="alert">{error}</p>{/if}
 <div class="upload-grid" class:upload-option-list={!!details}>
@@ -216,11 +268,15 @@
               >
             {:else}
               <span
-                >{!photo.xhr
-                  ? 'Na fila para envio…'
-                  : (photo.progress ?? 0) < 100
-                    ? `Enviando ${photo.progress ?? 0}%`
-                    : 'Preparando foto…'}</span
+                >{photo.preparing
+                  ? 'Lendo foto…'
+                  : !photo.xhr
+                    ? pausedPhotoKey
+                      ? 'Aguardando nova tentativa…'
+                      : 'Na fila para envio…'
+                    : (photo.progress ?? 0) < 100
+                      ? `Enviando ${photo.progress ?? 0}%`
+                      : 'Preparando foto…'}</span
               >
               <progress max="100" value={photo.progress ?? 0}></progress>
             {/if}

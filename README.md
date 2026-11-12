@@ -132,13 +132,15 @@ O WhatsApp é interceptado antes da navegação externa. Os contratos OAuth usam
 - `tests`: regras de domínio, contratos OAuth e fluxos E2E.
 - `static/brand` e `design/branding`: artes aprovadas; `static/demo-loja/attributions.json` registra as fotos da loja usadas na demonstração; `static/demo/attributions.json` registra as imagens ilustrativas e fixtures E2E.
 
-Produto e variação têm relação 1:N. O editor oferece **Um preço para o produto** (galeria de até oito fotos) e **Um preço por foto** (uma opção por imagem, sem limite de quantidade). No segundo modo, os campos de preço aparecem ao selecionar as fotos, enquanto a fila envia até duas imagens simultaneamente. Cada opção tem referência estável, preço, disponibilidade e exibição do preço próprios. Nome e referência podem ser personalizados em “Identificação e exibição do preço”.
+Produto e variação têm relação 1:N. O editor oferece **Um preço para o produto** (galeria de até oito fotos) e **Um preço por foto** (uma opção por imagem, sem limite de quantidade). No segundo modo, os campos de preço aparecem ao selecionar as fotos, enquanto a fila envia uma imagem por vez. Cada opção tem referência estável, preço, disponibilidade e exibição do preço próprios. Nome e referência podem ser personalizados em “Identificação e exibição do preço”.
 
 O cliente escolhe a foto antes de pedir. Links `/produtos/<slug>?opcao=<id>` abrem diretamente a opção, e a mensagem WhatsApp inclui esse link, o nome da opção e sua referência. Buscar a referência exata também abre a opção correspondente. Excluir uma foto remove sua opção e faz o link antigo retornar 404. Converter uma galeria existente mantém a referência da primeira opção; retornar ao preço único exige ter apenas uma opção salva.
 
 Mídias têm tipo e ordenação para permitir vídeos posteriormente. Preços privados de todas as opções são removidos no DTO público, antes do SSR ou da serialização. A mensagem WhatsApp usa os valores lidos no servidor no momento do envio. Produtos escondidos, rascunhos e excluídos retornam 404 público; imagens reais associadas também exigem produto publicado ou sessão autorizada.
 
 Fotos aceitam JPEG, PNG, WebP e HEIC/HEIF, até 15 MB, com limite de pixels no processamento principal. São rotacionadas conforme a orientação, reduzidas a 1800 px e convertidas em WebP, sem EXIF. O upload tem progresso, reenvio, escolha de capa e ordem. Fotos enviadas e depois abandonadas sem salvar ficam órfãs no armazenamento; uma rotina de limpeza poderá ser acrescentada antes de operação prolongada.
+
+No navegador, cada arquivo é lido para uma cópia independente antes do envio sequencial. A seleção nativa permanece associada às fotos que ainda aguardam leitura; adicionar outro lote não limpa a seleção anterior. Em falha de conexão ou timeout, a fila pausa e “Tentar novamente” reutiliza a cópia, mantendo fotos e preços. Remover a foto que causou a pausa também libera a fila. Erros de formato/preço não apagam os demais campos. Esse cuidado reduz a dependência de arquivos temporários de seletores mobile; há relatos dessa classe de falha no [rastreador do Chromium](https://issues.chromium.org/issues/40123366). A validação em um aparelho físico continua necessária.
 
 Os resultados conferidos e os limites dessa validação estão em [docs/validacao-local.md](docs/validacao-local.md).
 

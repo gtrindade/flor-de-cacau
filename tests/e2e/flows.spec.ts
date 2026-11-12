@@ -61,7 +61,10 @@ async function saveProduct(page: Page) {
   await response;
   await expect(page.getByRole('button', { name: 'Salvar produto', exact: true })).toBeEnabled();
 }
-async function selectPhotos(page: Page, files: string | string[]) {
+async function selectPhotos(
+  page: Page,
+  files: Parameters<ReturnType<Page['getByLabel']>['setInputFiles']>[0]
+) {
   const input = page.getByLabel('Escolher fotos', { exact: true });
   await expect(input).toBeEnabled();
   await input.setInputFiles(files);
@@ -915,7 +918,7 @@ async function cleanupPhotoProduct(page: Page, id: string) {
     });
 }
 
-test('lote de dez fotos preserva preços, referências e links de cada opção', async ({
+test('lote de onze fotos preserva preços, referências e links de cada opção', async ({
   page,
   request
 }, info) => {
@@ -934,30 +937,21 @@ test('lote de dez fotos preserva preços, referências e links de cada opção',
   const imageIds = new Map<string, string>();
   let concurrent = 0;
   let peak = 0;
-  let uploadsStarted = 0;
   let release!: () => void;
   const gate = new Promise<void>((resolve) => {
     release = resolve;
-  });
-  let releaseFirst!: () => void;
-  const firstUpload = new Promise<void>((resolve) => {
-    releaseFirst = resolve;
   });
   page.on('response', async (response) => {
     if (new URL(response.url()).pathname !== '/admin/upload' || !response.ok()) return;
     const photo = await response.json();
     imageIds.set(photo.alt, photo.id);
-    releaseFirst();
   });
   await page.route('**/admin/upload', async (route) => {
-    const first = uploadsStarted++ === 0;
     concurrent++;
     peak = Math.max(peak, concurrent);
     try {
       await gate;
-      // Forward the native multipart body. Replaying it with route.fetch loses file bytes in WebKit.
-      // The first request waits for the second response, exercising completion out of selection order.
-      if (first) await firstUpload;
+      // Delay native requests without replaying WebKit multipart uploads.
       await route.continue();
     } finally {
       concurrent--;
@@ -966,27 +960,27 @@ test('lote de dez fotos preserva preços, referências e links de cada opção',
   let productId = '';
   try {
     await page.getByLabel('Escolher fotos', { exact: true }).setInputFiles(
-      Array.from({ length: 10 }, (_, i) => ({
+      Array.from({ length: 11 }, (_, i) => ({
         name: `orquidea-${i + 1}.webp`,
         mimeType: 'image/webp',
         buffer
       }))
     );
     const rows = page.getByTestId('photo-option-editor');
-    await expect(rows).toHaveCount(10);
+    await expect(rows).toHaveCount(11);
     await expect(page.getByRole('button', { name: 'Salvar produto', exact: true })).toBeDisabled();
-    for (let i = 0; i < 10; i++)
+    for (let i = 0; i < 11; i++)
       await rows
         .nth(i)
         .getByLabel('Preço (R$)', { exact: true })
         .fill(String(100 + i * 10));
-    await expect.poll(() => concurrent).toBe(2);
-    expect(peak).toBeLessThanOrEqual(2);
+    await expect.poll(() => concurrent).toBe(1);
+    expect(peak).toBeLessThanOrEqual(1);
     release();
     await expect(page.getByRole('button', { name: 'Salvar produto', exact: true })).toBeEnabled();
-    await expect.poll(() => imageIds.size).toBe(10);
+    await expect.poll(() => imageIds.size).toBe(11);
     expect(JSON.parse(await page.locator('input[name=mediaIds]').inputValue())).toEqual(
-      Array.from({ length: 10 }, (_, i) => imageIds.get(`orquidea-${i + 1}.webp`))
+      Array.from({ length: 11 }, (_, i) => imageIds.get(`orquidea-${i + 1}.webp`))
     );
     if (info.project.use.hasTouch) {
       await expectReadableMobile(page);
@@ -1015,9 +1009,9 @@ test('lote de dez fotos preserva preços, referências e links de cada opção',
         [productId]
       )
     ).rows;
-    expect(choices).toHaveLength(10);
-    expect(new Set(choices.map((option) => option.sku)).size).toBe(10);
-    for (let i = 0; i < 10; i++) {
+    expect(choices).toHaveLength(11);
+    expect(new Set(choices.map((option) => option.sku)).size).toBe(11);
+    for (let i = 0; i < 11; i++) {
       expect(choices[i].price_cents).toBe((100 + i * 10) * 100);
       expect(choices[i].image_id).toBe(imageIds.get(`orquidea-${i + 1}.webp`));
     }
@@ -1048,14 +1042,14 @@ test('lote de dez fotos preserva preços, referências e links de cada opção',
     await editor.nth(4).getByText('Identificação e exibição do preço', { exact: true }).click();
     await editor.nth(4).getByLabel('Exibir preço desta opção', { exact: true }).uncheck();
     await editor.nth(4).getByLabel('Preço (R$)', { exact: true }).fill('9876,54');
-    await page.getByRole('button', { name: 'Mover foto 10 para antes', exact: true }).click();
+    await page.getByRole('button', { name: 'Mover foto 11 para antes', exact: true }).click();
     await saveProduct(page);
     await expect(page.getByRole('status')).toContainText('salvo');
     const publicHTML = await (await request.get(deepLink)).text();
     expect(publicHTML).not.toContain('987654');
     expect(publicHTML).not.toContain('9876,54');
     await page.goto(`/produtos/${product.slug}`);
-    await expect(page.getByTestId('photo-option')).toHaveCount(10);
+    await expect(page.getByTestId('photo-option')).toHaveCount(11);
     if (info.project.use.hasTouch) await expectReadableMobile(page);
     await page.goto(`/produtos/${product.slug}?opcao=${choices[0].id}`);
     await expect(
@@ -1086,13 +1080,12 @@ test('lote de dez fotos preserva preços, referências e links de cada opção',
     expect((await request.get(`/media/${choices[1].image_id}`)).status()).toBe(404);
     expect((await request.get(deepLink)).status()).toBe(200);
     choices = (await pool.query('SELECT id FROM variants WHERE product_id=$1', [productId])).rows;
-    expect(choices).toHaveLength(9);
+    expect(choices).toHaveLength(10);
     expect(choices.some((option) => option.id === chosen.id)).toBe(true);
     await page.goto(`/produtos/${product.slug}`);
     await page.screenshot({ path: info.outputPath('opcoes-por-foto.png'), fullPage: true });
   } finally {
     release();
-    releaseFirst();
     if (productId) await cleanupPhotoProduct(page, productId);
   }
 });
@@ -1264,5 +1257,96 @@ test('converter galeria existente mantém fotos e a referência original', async
     ).toHaveLength(2);
   } finally {
     await cleanupPhotoProduct(page, id);
+  }
+});
+
+test('onze fotos: falha de conexão pausa a fila, repetir funciona e permite novos lotes', async ({
+  page
+}, info) => {
+  test.setTimeout(120_000);
+  await login(page);
+  await page.goto('/admin/produtos/novo');
+  await page.getByRole('radio', { name: 'Um preço por foto', exact: true }).check();
+  await page
+    .getByLabel('Nome do produto', { exact: true })
+    .fill(`Fila celular ${info.project.name}`);
+  const { readFile } = await import('node:fs/promises');
+  const buffer = await readFile('static/demo-loja/orquidea-rajada.webp');
+  const images = Array.from({ length: 13 }, (_, i) => ({
+    name: `fila-${i + 1}.webp`,
+    mimeType: 'image/webp',
+    buffer
+  }));
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let attempts = 0;
+  const received = new Map<string, string>();
+  page.on('response', async (response) => {
+    if (new URL(response.url()).pathname !== '/admin/upload' || !response.ok()) return;
+    const photo = await response.json();
+    received.set(photo.alt, photo.id);
+  });
+  await page.route('**/admin/upload', async (route) => {
+    attempts++;
+    await gate;
+    if (attempts === 3) await route.abort('connectionfailed');
+    else await route.continue();
+  });
+  let productId = '';
+  try {
+    await selectPhotos(page, images.slice(0, 11));
+    const rows = page.getByTestId('photo-option-editor');
+    await expect(rows).toHaveCount(11);
+    for (let i = 0; i < 11; i++)
+      await rows
+        .nth(i)
+        .getByLabel('Preço (R$)', { exact: true })
+        .fill(String(100 + i));
+    await expect.poll(() => attempts).toBe(1);
+    expect(
+      await page
+        .locator('input[type=file]')
+        .evaluateAll((inputs) =>
+          inputs.some((input) => (input as HTMLInputElement).files?.length === 11)
+        )
+    ).toBe(true);
+    release();
+    await expect(rows.nth(2).getByRole('alert')).toContainText('Falha de conexão');
+    await expect(rows.nth(3)).toContainText('Aguardando nova tentativa');
+    expect(attempts).toBe(3);
+    await expect(rows.nth(2).getByLabel('Preço (R$)', { exact: true })).toHaveValue('102');
+    await expect(page.getByRole('button', { name: 'Salvar produto', exact: true })).toBeDisabled();
+    await selectPhotos(page, images.slice(11));
+    await expect(rows).toHaveCount(13);
+    await rows.nth(11).getByLabel('Preço (R$)', { exact: true }).fill('111');
+    await rows.nth(12).getByLabel('Preço (R$)', { exact: true }).fill('112');
+    await rows.nth(4).getByRole('button', { name: 'Cancelar envio', exact: true }).click();
+    await expect(rows).toHaveCount(12);
+    expect(attempts).toBe(3);
+    await rows.nth(2).getByRole('button', { name: 'Tentar novamente', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Salvar produto', exact: true })).toBeEnabled({
+      timeout: 30_000
+    });
+    await expect.poll(() => received.size).toBe(12);
+    expect(attempts).toBe(13);
+    expect(JSON.parse(await page.locator('input[name=mediaIds]').inputValue())).toEqual(
+      images.filter((_, i) => i !== 4).map((image) => received.get(image.name))
+    );
+    await expect(rows.nth(2).getByLabel('Preço (R$)', { exact: true })).toHaveValue('102');
+    await saveProduct(page);
+    await expect(page.getByRole('status')).toContainText('criado');
+    productId = page.url().split('/').pop()!.split('?')[0]!;
+    const [product] = (
+      await pool.query('SELECT publication FROM products WHERE id=$1', [productId])
+    ).rows;
+    expect(product.publication).toBe('draft');
+    expect(
+      (await pool.query('SELECT id FROM variants WHERE product_id=$1', [productId])).rowCount
+    ).toBe(12);
+  } finally {
+    release();
+    if (productId) await cleanupPhotoProduct(page, productId);
   }
 });
