@@ -136,6 +136,12 @@ As confirmações e os erros dos formulários usam notificações globais no top
 
 Produto e variação têm relação 1:N. O editor oferece **Um preço para o produto** (galeria de até oito fotos) e **Um preço por foto** (uma opção por imagem, sem limite de quantidade). No segundo modo, os campos de preço aparecem ao selecionar as fotos, enquanto a fila envia uma imagem por vez. Cada opção tem referência estável, preço, disponibilidade e exibição do preço próprios. Nome e referência podem ser personalizados em “Identificação e exibição do preço”.
 
+**Cadastro em lote**, na listagem administrativa, cria um produto independente por foto. Cada item tem nome, preço, disponibilidade e descrição opcional; nomes vazios recebem `Opção N`. Categorias e visibilidade são escolhidas para o lote. O envio usa a mesma fila sequencial do editor. O salvamento inteiro acontece em uma transação, e fotos já utilizadas não podem gerar produtos duplicados.
+
+Para agrupar, selecione pelo menos dois produtos na listagem e clique em **Juntar selecionados**. Informe o nome e a visibilidade do grupo; os cadastros originais serão substituídos por um produto com opções. IDs, referências, preços, disponibilidade, descrições e todas as fotos são preservados, assim como a união das categorias. Galerias de produtos agrupados continuam associadas à respectiva opção, inclusive ao salvar o editor novamente. Cada produto selecionado precisa ter fotos. A descrição de cada opção pode ser ajustada em “Identificação e exibição do preço”.
+
+Links publicados antes de agrupar ou separar acompanham a mesma opção por redirecionamento permanente. Um link para um grupo separado sem opção específica retorna ao catálogo. Opções removidas e produtos escondidos continuam retornando 404. As associações ficam em `product_aliases`, vinculadas ao ID estável da variação.
+
 O cliente escolhe a foto antes de pedir. Links `/produtos/<slug>?opcao=<id>` abrem diretamente a opção, e a mensagem WhatsApp inclui esse link, o nome da opção e sua referência. Buscar a referência exata também abre a opção correspondente. Excluir uma foto remove sua opção e faz o link antigo retornar 404. Converter uma galeria existente mantém a referência da primeira opção; retornar ao preço único exige ter apenas uma opção salva.
 
 Mídias têm tipo e ordenação para permitir vídeos posteriormente. Preços privados de todas as opções são removidos no DTO público, antes do SSR ou da serialização. A mensagem WhatsApp usa os valores lidos no servidor no momento do envio. Produtos escondidos, rascunhos e excluídos retornam 404 público; imagens reais associadas também exigem produto publicado ou sessão autorizada.
@@ -147,6 +153,16 @@ No navegador, cada arquivo é lido para uma cópia independente antes do envio s
 A preparação das fotos independe da velocidade de envio: um leitor prepara cópias antecipadamente, com limite de 32 MB de arquivos preparados na fila, enquanto um upload segue por vez. Prévias são criadas somente das cópias completas, evitando uma segunda leitura concorrente do arquivo nativo. A leitura tenta até três vezes em falhas temporárias. Se continuar ilegível, **Selecionar foto novamente** abre o seletor no próprio item e mantém posição, preço e identificação; repetir a requisição de rede não resolve um arquivo que o navegador não consegue mais ler. A página rola até a primeira foto de cada novo lote, respeitando a preferência de movimento reduzido.
 
 Os resultados conferidos e os limites dessa validação estão em [docs/validacao-local.md](docs/validacao-local.md).
+
+### Separação assistida de um produto existente
+
+`scripts/split-product.ts` separa opções em produtos independentes, preservando os mesmos IDs, referências, preços e arquivos. Cada produto recebe a descrição da sua opção, ou fica sem descrição; o texto comum do grupo permanece no snapshot, pois pode não descrever todas as fotos. A execução normal é somente leitura:
+
+```sh
+node --env-file-if-exists=.env.local --import tsx scripts/split-product.ts --product ID --expect-count N
+```
+
+Depois de revisar o plano, acrescente `--apply --expect-fingerprint HASH_DO_PLANO --snapshot /caminho/privado/antes.json`. O arquivo precisa ser novo; o script grava um snapshot privado com permissão 600 antes da transação e um recibo `.result.json` após concluir. Mudança no cadastro ou na contagem entre plano e aplicação cancela a operação. Em Docker, use o serviço `init` com um diretório privado montado para o snapshot; não grave snapshots no repositório. O script é uma migração assistida, não uma rotina de backup. Uma release anterior ao agrupamento não deve ser usada para editar os dados reorganizados.
 
 A escala de tipografia do celular, referências de e-commerce consultadas e verificações de ampliação estão em [docs/tipografia-mobile.md](docs/tipografia-mobile.md).
 

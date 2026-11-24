@@ -1,5 +1,36 @@
 # Validação da aplicação e implantação
 
+A validação mais recente ocorreu em 24 de novembro de 2026, pelo snapshot `20261124T133533Z-14960`. A release está publicada em `https://flordecacau.ddns.net`, com Node 24.22.3 em ARM64 e PostgreSQL 18.
+
+| Verificação                                     | Resultado                                                               |
+| ----------------------------------------------- | ----------------------------------------------------------------------- |
+| TypeScript e Svelte                             | 0 erros e 0 avisos                                                      |
+| Build de produção                               | Aprovado no Docker local e no Raspberry ARM64                           |
+| Testes unitários                                | 13 aprovados                                                            |
+| Contratos Google OAuth simulados                | 6 aprovados                                                             |
+| E2E Chromium, Firefox, WebKit, Android e iPhone | 175 aprovados, zero falhas, sem retries                                 |
+| Scripts de implantação                          | 10 testes aprovados                                                     |
+| Persistência após reinício E2E                  | 5 rascunhos preservados                                                 |
+| Ambiente local                                  | Atualizado, saudável e com os 12 produtos anteriores preservados        |
+| Migração no Raspberry                           | 45 opções separadas em 45 produtos independentes                        |
+| Integridade das imagens                         | 95 mídias preservadas; hashes SHA-256 dos 95 arquivos idênticos         |
+| HTTPS público                                   | 45 páginas, 45 redirecionamentos antigos e respectivas fotos conferidos |
+| Runtime de imagem ARM64                         | Sharp convertido para WebP em memória com sucesso                       |
+
+Os 25 cenários novos cobrem cadastro de onze produtos em lote, inclusão de mais fotos, reordenação sem perder preços, descrição opcional, nomes provisórios, categorias e preços privados. Conferem também agrupamento pela UI, preservação de galerias e descrições ao salvar novamente, conversão de uma opção restante para produto simples, ocultação e exclusão com 404, rejeição de acessos não autorizados, falhas atômicas, envio duplicado e agrupamento concorrente com exclusão. A separação assistida é executada pelo próprio CLI contra o PostgreSQL E2E, incluindo plano somente leitura, contagem incorreta, fingerprint inválido ou desatualizado, snapshot privado e reagrupamento pela UI. Há conferência de 320 px com texto ampliado em 200%.
+
+A primeira execução completa foi bloqueada por um falso positivo em um teste antigo: os dígitos do preço privado `8990` apareceram em um UUID de foto. O teste interrompido deixou um produto publicado e afetou quatro contagens de catálogo posteriores. A verificação passou a distinguir números de segmentos de IDs, conferir o valor privado nulo e o preço formatado; a limpeza do produto ocorre também em falhas. Os três cenários afetados passaram isoladamente e a execução completa seguinte aprovou os 175 E2E em 9,6 minutos. Nenhuma execução reprovada foi enviada ao servidor. Uma captura ampliada no iPhone também passou a usar escala CSS para respeitar o limite de pixels do WebKit.
+
+Antes de separar o cadastro real, foram comparados todos os campos anteriores do produto, das 45 opções e das 95 mídias: a implantação e a migration aditiva `0002_product_batches_and_grouping` preservaram os dados. O CLI salvou plano, snapshot anterior e recibo em `shared/data-migrations`, fora das releases, com diretório privado e arquivos com permissão 600. O fingerprint foi conferido novamente dentro da transação de aplicação.
+
+As 45 opções do produto “Buquê” agora são produtos simples “Opção 1” a “Opção 45”. IDs das variações, referências, preços, disponibilidade, visibilidade, categorias e imagens foram preservados. As descrições individuais ficaram vazias, conforme combinado; a descrição coletiva anterior permanece no snapshot. O agrupamento desses produtos reais ficou para o usuário testar pela interface.
+
+Após a migração, cada página de produto e cada link antigo com `?opcao=` foram conferidos por HTTPS com validação normal de certificado. As fotos públicas retornaram os mesmos hashes dos arquivos originais. Busca por referência retornou o novo produto; `/admin` e o cadastro em lote sem sessão redirecionaram para login. Um pedido retornou HTTP 303 com referência e URL HTTPS corretas, sem seguir o link para WhatsApp ou enviar mensagens. Aplicação e banco ficaram saudáveis.
+
+Capturas `lote-mobile.png`, `selecao-mobile.png`, `agrupar-mobile.png` e `grupo-texto-ampliado.png` estão no relatório E2E local. Os perfis mobile são emulados; o seletor nativo e o uso no aparelho físico continuam cobertos pelas conferências dos usuários. A rotina de backups permanece fora de escopo.
+
+## Validações anteriores
+
 A suíte completa foi executada novamente em 12 de novembro de 2026, pelo snapshot de implantação `20261112T173017Z-72445`. A mesma release foi publicada no Raspberry e conferida por SSH e HTTPS público. A aplicação usa Node 24.22.2 e PostgreSQL 18; o Raspberry executa as imagens nativas ARM64.
 
 | Verificação                                             | Resultado                                                                                    |

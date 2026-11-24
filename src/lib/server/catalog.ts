@@ -8,6 +8,7 @@ import {
   variants,
   categories,
   productCategories,
+  productAliases,
   media,
   siteSettings
 } from './db/schema';
@@ -99,8 +100,16 @@ export async function getProducts(internal = false) {
       id: variant.id,
       sku: variant.sku,
       name: variant.name,
+      description: variant.description,
       imageId: variant.imageId,
       image: productImages.find((image) => image.id === variant.imageId) ?? null,
+      images: productImages
+        .filter(
+          (image) =>
+            image.id === variant.imageId ||
+            images.some((raw) => raw.id === image.id && raw.variantId === variant.id)
+        )
+        .sort((a, b) => (a.id === variant.imageId ? -1 : b.id === variant.imageId ? 1 : 0)),
       priceCents: internal || variant.showPrice ? variant.priceCents : null,
       showPrice: variant.showPrice,
       availability: variant.availability
@@ -128,6 +137,28 @@ export async function getProduct(slugOrId: string, internal = false) {
   const product = all.find((p) => (internal ? p.id === slugOrId : p.slug === slugOrId));
   if (!product) error(404, 'Produto não encontrado.');
   return product;
+}
+export async function getProductRedirect(sourceSlug: string, optionId?: string | null) {
+  const aliases = await db
+    .select({ slug: products.slug, mode: products.mode, variantId: variants.id })
+    .from(productAliases)
+    .innerJoin(variants, eq(variants.id, productAliases.variantId))
+    .innerJoin(products, eq(products.id, variants.productId))
+    .where(
+      and(
+        eq(productAliases.sourceSlug, sourceSlug),
+        eq(products.publication, 'published'),
+        optionId ? eq(productAliases.variantId, optionId) : undefined
+      )
+    );
+  if (!aliases.length) return null;
+  if (aliases.length === 1) {
+    const option = aliases[0]!;
+    return `/produtos/${encodeURIComponent(option.slug)}${option.mode === 'photo_variants' ? `?opcao=${encodeURIComponent(option.variantId)}` : ''}`;
+  }
+  if (new Set(aliases.map((alias) => alias.slug)).size === 1)
+    return `/produtos/${encodeURIComponent(aliases[0]!.slug)}`;
+  return '/catalogo';
 }
 export async function getAccessibleMedia(id: string, admin: boolean) {
   const [image] = await db.select().from(media).where(eq(media.id, id));

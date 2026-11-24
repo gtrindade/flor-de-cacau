@@ -1,16 +1,31 @@
-import { fail } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
 import { getProducts } from '#lib/server/catalog';
 import { db } from '#lib/server/db';
 import { products, variants } from '#lib/server/db/schema';
 import { requireAdmin } from '#lib/server/guards';
 import { deleteProduct, actionError } from '#lib/server/product-actions';
+import { groupProducts } from '#lib/server/product-bundles';
 import type { Actions, PageServerLoad } from './$types';
-export const load: PageServerLoad = async ({ locals }) => {
+export const load: PageServerLoad = async ({ locals, url }) => {
   requireAdmin(locals);
-  return { products: await getProducts(true) };
+  const createdCount = Number(url.searchParams.get('lote'));
+  return {
+    products: await getProducts(true),
+    createdCount: Number.isSafeInteger(createdCount) && createdCount > 0 ? createdCount : 0
+  };
 };
 export const actions: Actions = {
+  group: async ({ request, locals }) => {
+    requireAdmin(locals);
+    let id;
+    try {
+      id = await groupProducts(await request.formData());
+    } catch (cause) {
+      return fail(400, { error: actionError(cause) });
+    }
+    redirect(303, `/admin/produtos/${id}?agrupado=1`);
+  },
   visibility: async ({ request, locals }) => {
     requireAdmin(locals);
     const form = await request.formData();
@@ -53,7 +68,8 @@ export const actions: Actions = {
     if (!product || f.get('confirmation') !== product.name)
       return fail(400, { error: 'Digite o nome exato do produto para excluir.' });
     try {
-      await deleteProduct(product.id);
+      if (!(await deleteProduct(product.id)))
+        return fail(404, { error: 'Este produto foi reorganizado ou excluído. Atualize a lista.' });
       return { success: 'Produto excluído permanentemente.' };
     } catch (e) {
       return fail(400, { error: actionError(e) });

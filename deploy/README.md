@@ -79,6 +79,8 @@ Inclua o novo hostname na atualização automática do DDNS caso o IP público m
 
 Os containers usam `restart: unless-stopped`, e o Docker é habilitado no boot. O PostgreSQL não publica porta no host. Os scripts não executam `down --volumes`, `prune` ou reset de banco. Atualizações concorrentes no servidor são bloqueadas por `flock`. A configuração de backups permanece sob responsabilidade do usuário, conforme combinado.
 
+A migration `0002_product_batches_and_grouping` acrescenta descrições por opção, associação de galerias e links antigos. Depois de reorganizar produtos, use uma release que entenda esses dados ao fazer rollback ou editar o catálogo. O rollback da aplicação não desfaz migrações de dados. A separação assistida de opções está descrita no README principal; seus planos, snapshots e recibos ficam em `shared/data-migrations`, com acesso privado, e não substituem a rotina de backup do usuário.
+
 Para outro servidor, configure `FLORA_HOST` e `FLORA_DEPLOY_ROOT` no ambiente. Os defaults são `trindade@raspberry-server.local` e o diretório acima.
 
 Referências: [Docker no Debian](https://docs.docker.com/engine/install/debian/), [Compose em produção](https://docs.docker.com/compose/how-tos/production/), [callbacks Google](https://developers.google.com/identity/protocols/oauth2/web-server#uri-validation).

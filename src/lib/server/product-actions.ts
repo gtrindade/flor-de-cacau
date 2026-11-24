@@ -11,6 +11,7 @@ const optionInput = z.object({
   id: z.string().max(120).default(''),
   imageId: z.string().min(1).max(120),
   name: z.string().trim().max(180).default(''),
+  description: z.string().max(6000).default(''),
   sku: z.string().trim().max(80).default(''),
   price: z.string().max(40),
   showPrice: z.boolean(),
@@ -123,7 +124,6 @@ export async function saveProduct(form: FormData, ownerId: string, id?: string) 
     if (selectedCategories.length !== categoryIds.length)
       throw new Error('Uma categoria não está disponível. Atualize a página.');
     const previousMedia = await tx.select().from(media).where(eq(media.productId, productId));
-    removed = previousMedia.filter((image) => !parsed.mediaIds.includes(image.id));
     const productValues = {
       name: parsed.name,
       description: parsed.description,
@@ -134,13 +134,11 @@ export async function saveProduct(form: FormData, ownerId: string, id?: string) 
     };
     if (existing) await tx.update(products).set(productValues).where(eq(products.id, productId));
     else
-      await tx
-        .insert(products)
-        .values({
-          id: productId,
-          slug: `${slugify(parsed.name)}-${productId.slice(0, 6)}`,
-          ...productValues
-        });
+      await tx.insert(products).values({
+        id: productId,
+        slug: `${slugify(parsed.name)}-${productId.slice(0, 6)}`,
+        ...productValues
+      });
     const nextVariants =
       parsed.mode === 'photo_variants'
         ? options.map((option, position) => {
@@ -157,6 +155,7 @@ export async function saveProduct(form: FormData, ownerId: string, id?: string) 
                 option.name ||
                 (existing?.mode === 'photo_variants' ? previous?.name : '') ||
                 `Opção ${position + 1}`,
+              description: option.description,
               sku:
                 option.sku ||
                 previous?.sku ||
@@ -173,6 +172,7 @@ export async function saveProduct(form: FormData, ownerId: string, id?: string) 
               imageId: null,
               position: 0,
               name: 'Padrão',
+              description: '',
               sku:
                 parsed.sku ||
                 previousVariants[0]?.sku ||
@@ -185,6 +185,20 @@ export async function saveProduct(form: FormData, ownerId: string, id?: string) 
     if (new Set(nextVariants.map((variant) => variant.sku)).size !== nextVariants.length)
       throw new Error('Cada opção precisa de uma referência diferente.');
     const retained = new Set(nextVariants.map((variant) => variant.id));
+    const retainedMedia = new Set(parsed.mediaIds);
+    if (parsed.mode === 'photo_variants' && existing?.mode === 'photo_variants') {
+      for (const image of previousMedia) {
+        if (
+          image.variantId &&
+          retained.has(image.variantId) &&
+          previousVariants.some(
+            (variant) => variant.id === image.variantId && variant.imageId !== image.id
+          )
+        )
+          retainedMedia.add(image.id);
+      }
+    }
+    removed = previousMedia.filter((image) => !retainedMedia.has(image.id));
     const deletedVariants = previousVariants.filter((variant) => !retained.has(variant.id));
     if (deletedVariants.length)
       await tx.delete(variants).where(
@@ -213,16 +227,31 @@ export async function saveProduct(form: FormData, ownerId: string, id?: string) 
     for (const [position, mediaId] of parsed.mediaIds.entries())
       await tx
         .update(media)
-        .set({ productId, position, alt: parsed.name })
+        .set({
+          productId,
+          position,
+          alt: parsed.name,
+          variantId:
+            parsed.mode === 'standard'
+              ? nextVariants[0]!.id
+              : nextVariants.find((variant) => variant.imageId === mediaId)!.id
+        })
         .where(eq(media.id, mediaId));
   });
   await removeFiles(removed.map((image) => image.storageKey));
   return productId;
 }
 export async function deleteProduct(id: string) {
-  const images = await db.select().from(media).where(eq(media.productId, id));
-  await db.delete(products).where(eq(products.id, id));
+  const images = await db.transaction(async (tx) => {
+    const [product] = await tx.select().from(products).where(eq(products.id, id)).for('update');
+    if (!product) return null;
+    const images = await tx.select().from(media).where(eq(media.productId, id));
+    await tx.delete(products).where(eq(products.id, id));
+    return images;
+  });
+  if (!images) return false;
   await removeFiles(images.map((m) => m.storageKey));
+  return true;
 }
 export function actionError(cause: unknown) {
   if (cause instanceof z.ZodError) return cause.issues[0]?.message ?? 'Confira os dados.';

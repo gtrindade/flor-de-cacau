@@ -90,6 +90,7 @@ export const variants = pgTable(
       .references(() => products.id, { onDelete: 'cascade' }),
     sku: text('sku').notNull().unique(),
     name: text('name').notNull().default('Padrão'),
+    description: text('description').notNull().default(''),
     imageId: text('image_id').references((): AnyPgColumn => media.id, { onDelete: 'set null' }),
     position: integer('position').notNull().default(0),
     priceCents: integer('price_cents'),
@@ -127,6 +128,9 @@ export const productCategories = pgTable(
 export const media = pgTable('media', {
   id: text('id').primaryKey(),
   productId: text('product_id').references(() => products.id, { onDelete: 'cascade' }),
+  variantId: text('variant_id').references((): AnyPgColumn => variants.id, {
+    onDelete: 'set null'
+  }),
   ownerId: text('owner_id').references(() => user.id, { onDelete: 'set null' }),
   type: text('type').notNull().default('image'),
   storageKey: text('storage_key').notNull(),
@@ -136,6 +140,16 @@ export const media = pgTable('media', {
   position: integer('position').notNull().default(0),
   ...dates
 });
+export const productAliases = pgTable(
+  'product_aliases',
+  {
+    sourceSlug: text('source_slug').notNull(),
+    variantId: text('variant_id')
+      .notNull()
+      .references(() => variants.id, { onDelete: 'cascade' })
+  },
+  (t) => [primaryKey({ columns: [t.sourceSlug, t.variantId] })]
+);
 export const siteSettings = pgTable(
   'site_settings',
   {

@@ -11,12 +11,16 @@
   let activeVariant = $derived(data.selectedVariant ?? data.product.variant);
   let showingOptions = $derived(data.product.mode === 'photo_variants' && !data.selectedVariant);
   let displayImages = $derived(
-    data.product.mode === 'photo_variants' && activeVariant.image
-      ? [activeVariant.image]
+    data.product.mode === 'photo_variants' && activeVariant.images.length
+      ? activeVariant.images
       : data.product.images
+  );
+  let description = $derived(
+    (!showingOptions && activeVariant.description) || data.product.description
   );
   $effect(() => {
     data.product.id;
+    activeVariant.id;
     selected = 0;
   });
 </script>
@@ -24,13 +28,13 @@
 <svelte:head
   ><title>{data.product.name} · Flor de Cacau</title><meta
     name="description"
-    content={data.product.description.slice(0, 155)}
+    content={description.slice(0, 155)}
   /><link rel="canonical" href={data.canonicalURL} /><meta
     property="og:url"
     content={data.canonicalURL}
   /><meta property="og:title" content={`${data.product.name} · Flor de Cacau`} /><meta
     property="og:description"
-    content={data.product.description.slice(0, 155)}
+    content={description.slice(0, 155)}
   />{#if displayImages[0]}<meta
       property="og:image"
       content={new URL(displayImages[0].url, data.canonicalURL).href}
@@ -120,7 +124,7 @@
             ? money(activeVariant.priceCents)
             : 'Valor sob consulta'}
         </p>
-        <p class="detail-description">{data.product.description}</p>
+        <p class="detail-description">{description}</p>
         {#if activeVariant.availability === 'unavailable'}
           <p class="notice unavailable-notice">Este produto está indisponível no momento.</p>
         {:else}

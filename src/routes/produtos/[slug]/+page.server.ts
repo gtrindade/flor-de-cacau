@@ -1,11 +1,19 @@
-import { error, fail, redirect } from '@sveltejs/kit';
+import { error, fail, isHttpError, redirect } from '@sveltejs/kit';
 import { z } from 'zod';
-import { getProduct, getSettings } from '#lib/server/catalog';
+import { getProduct, getProductRedirect, getSettings } from '#lib/server/catalog';
 import { brazilianStates, buildWhatsAppMessage, productOptionPath } from '#lib/domain';
 import type { Actions, PageServerLoad } from './$types';
 export const load: PageServerLoad = async ({ params, url }) => {
-  const product = await getProduct(params.slug);
   const optionId = url.searchParams.get('opcao');
+  let product;
+  try {
+    product = await getProduct(params.slug);
+  } catch (cause) {
+    if (!isHttpError(cause, 404)) throw cause;
+    const destination = await getProductRedirect(params.slug, optionId);
+    if (destination) redirect(308, destination);
+    throw cause;
+  }
   const selectedVariant = optionId
     ? product.variants.find((variant) => variant.id === optionId)
     : null;

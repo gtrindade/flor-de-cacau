@@ -12,12 +12,14 @@
     product,
     categories,
     form,
-    saved = false
+    saved = false,
+    notice
   }: {
     product: Product | null;
     categories: { id: string; name: string }[];
     form?: { error?: string; success?: string } | null;
     saved?: boolean;
+    notice?: string;
   } = $props();
   let fields = $state(
     untrack(() => ({
@@ -39,11 +41,17 @@
     untrack(() => (product?.mode === 'photo_variants' ? 'photo_variants' : 'standard'))
   );
   let photos = $state<UploadPhoto[]>(
-    untrack(() => (product?.images ?? []).map((photo) => ({ ...photo, key: photo.id })))
+    untrack(() =>
+      (product?.mode === 'photo_variants'
+        ? product.variants.flatMap((option) => (option.image ? [option.image] : []))
+        : (product?.images ?? [])
+      ).map((photo) => ({ ...photo, key: photo.id }))
+    )
   );
   type OptionFields = {
     id: string;
     name: string;
+    description: string;
     sku: string;
     price: string;
     showPrice: boolean;
@@ -62,6 +70,7 @@
           options[photo.key] = {
             id: product?.mode === 'photo_variants' ? (savedOption?.id ?? '') : '',
             name: product?.mode === 'photo_variants' ? (savedOption?.name ?? '') : '',
+            description: savedOption?.description ?? '',
             sku: savedOption?.sku ?? '',
             price:
               savedOption?.priceCents != null
@@ -97,6 +106,12 @@
       fields.sku = first.sku;
       showPrice = first.showPrice;
       fields.availability = first.availability;
+      fields.description = first.description || fields.description;
+      if (product?.mode === 'photo_variants' && product.variants.length === 1)
+        photos = product.images.map(
+          (photo) =>
+            photos.find((current) => current.id === photo.id) ?? { ...photo, key: photo.id }
+        );
     }
   }
   let uploading = $state(false);
@@ -110,6 +125,10 @@
 {#snippet photoDetails(photo: UploadPhoto, index: number)}
   {#if options[photo.key]}
     {@const option = options[photo.key]!}
+    {@const additional =
+      product?.variants
+        .find((item) => item.id === option.id)
+        ?.images.filter((image) => image.id !== photo.id) ?? []}
     <div class="photo-option-fields">
       <h3>{option.name || `Opção ${index + 1}`}</h3>
       <p class="field-hint">{option.sku || 'Referência gerada ao salvar'}</p>
@@ -146,6 +165,21 @@
           maxlength="80"
           placeholder="Gerada automaticamente"
         />
+        <label for={`option-description-${photo.key}`}>Descrição da opção (opcional)</label>
+        <textarea
+          id={`option-description-${photo.key}`}
+          bind:value={option.description}
+          rows="2"
+          maxlength="6000"></textarea>
+        {#if additional.length}<p class="field-hint">
+            {additional.length}
+            {additional.length === 1
+              ? 'outra foto desta opção será mantida'
+              : 'outras fotos desta opção serão mantidas'}.
+          </p>
+          <div class="option-extra-images">
+            {#each additional as image}<img src={image.url} alt={image.alt} loading="lazy" />{/each}
+          </div>{/if}
         <label class="check-row"
           ><input type="checkbox" bind:checked={option.showPrice} />Exibir preço desta opção</label
         >
@@ -170,6 +204,11 @@
       rel="noreferrer">Ver no site<ExternalLink size={16} /></a
     >{/if}
 </div>
+{#if !product}<p class="notice batch-entry-note">
+    Vai cadastrar produtos diferentes? <a href="/admin/produtos/lote"
+      >Use o cadastro em lote: uma foto para cada produto.</a
+    >
+  </p>{/if}
 <form
   method="POST"
   class="editor-form"
@@ -181,7 +220,10 @@
     };
   }}
 >
-  <FormFeedback {form} savedMessage={saved ? 'Produto criado com carinho.' : undefined} />
+  <FormFeedback
+    {form}
+    savedMessage={notice || (saved ? 'Produto criado com carinho.' : undefined)}
+  />
   <fieldset class="editor-fields" disabled={!ready}>
     <legend class="sr-only">Informações para edição</legend>
     <fieldset class="product-mode-picker">
@@ -213,7 +255,8 @@
         />
         <span
           ><strong>Um preço por foto</strong><small
-            >Cada foto é uma opção para o cliente escolher.</small
+            >Opções do mesmo produto, como orquídeas com preços diferentes. Para produtos
+            diferentes, use o cadastro em lote.</small
           ></span
         >
       </label>

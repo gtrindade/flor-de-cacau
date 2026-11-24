@@ -44,13 +44,16 @@ Criar um catálogo público da Floricultura Flor de Cacau, em Sabará, com admin
 
 - Modelar a relação Produto → Variações como um para muitos.
 - Dois modos por produto: galeria com um preço único, ou uma opção por foto com preço próprio. O modo por foto aceita seleção em lote sem limite de quantidade; o limite de 15 MB continua valendo por imagem.
+- Cadastro em lote separado: cada foto cria um produto independente, com nome, preço, disponibilidade e descrição opcional. Usar “Opção N” quando não houver nome. Categorias e visibilidade podem ser aplicadas ao lote inteiro. Falhas devem cancelar o salvamento inteiro, sem cadastros parciais ou duplicações ao repetir a requisição.
+- Seleção múltipla na listagem administrativa para juntar produtos em um único produto com opções. Pedir nome e visibilidade do grupo, preservar todas as fotos, preços, disponibilidade, descrições, categorias e referências. Galerias continuam pertencendo à opção de origem. Os cadastros originais são substituídos pelo grupo.
+- Preservar links públicos antigos por redirecionamento à mesma opção após reorganizar produtos. Opções excluídas ou escondidas retornam 404. Um grupo separado sem opção específica direciona ao catálogo.
 - Ao selecionar fotos no segundo modo, apresentar imediatamente campos de preço associados a cada prévia, preservando essa associação ao longo da fila. Enviar uma foto por vez. Falhas de conexão pausam a fila, e uma nova tentativa mantém os preços e as fotos já escolhidas. É possível adicionar mais fotos ou remover alguma antes de salvar/publicar. Disponibilidade, exibição do preço, nome e referência são editáveis por opção.
 - Ao adicionar fotos, rolar a página até a primeira foto do novo lote, inclusive quando já houver fotos anteriores. Respeitar movimento reduzido. Falhas de leitura oferecem nova seleção no mesmo item, preservando preço, posição e identificação; a recuperação não deve exigir excluir o lote inteiro.
 - Confirmações e erros dos formulários aparecem também como toasts fixos no topo da tela, independentemente da rolagem, com duração de cinco segundos e fechamento manual. Repetir a mesma ação deve renovar a notificação. Erros que exigem correção permanecem detalhados junto ao formulário. Aplicar o padrão ao catálogo administrativo, editor de produtos, categorias, configurações, login, seleção de fotos e solicitação pelo WhatsApp.
 - Cada opção tem identificação estável. Reordenar fotos ou editar preços não altera referências nem links já enviados. Converter uma galeria existente preserva sua referência na primeira opção.
 - O catálogo mostra um único produto e, ao abri-lo, permite escolher a foto/opção. O link direto identifica a opção por `?opcao=<id>`. Uma opção removida ou pertencente a outro produto retorna 404.
 - Produto concentra nome, descrição, categorias, fotos, URL e visibilidade.
-- Variação concentra referência, nome da opção, preço, exibição do preço e disponibilidade.
+- Variação concentra referência, nome, descrição opcional, galeria associada, preço, exibição do preço e disponibilidade.
 - Preparar evolução para opções como buquês de 6, 12 ou 24 rosas, com valores próprios.
 - Quantidade livre de rosas com cálculo de preço não faz parte desta primeira versão.
 - Permitir preço cadastrado internamente e anúncio público sem preço, com chamada para consultar pelo WhatsApp.

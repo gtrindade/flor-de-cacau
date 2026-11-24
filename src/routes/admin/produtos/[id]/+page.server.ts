@@ -8,7 +8,8 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
   return {
     product: await getProduct(params.id, true),
     categories: await getCategories(),
-    saved: url.searchParams.has('salvo')
+    saved: url.searchParams.has('salvo'),
+    notice: url.searchParams.has('agrupado') ? 'Produtos agrupados com carinho.' : undefined
   };
 };
 export const actions: Actions = {

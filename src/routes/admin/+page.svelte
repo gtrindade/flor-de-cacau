@@ -6,10 +6,27 @@
   import EyeOff from '@lucide/svelte/icons/eye-off';
   import Eye from '@lucide/svelte/icons/eye';
   import Trash2 from '@lucide/svelte/icons/trash-2';
+  import Layers from '@lucide/svelte/icons/layers';
+  import * as Dialog from '#lib/components/ui/dialog';
   import { money, productPriceLabel, availabilityLabels, type Availability } from '#lib/domain';
   import type { PageProps } from './$types';
   let { data, form }: PageProps = $props();
   let deleting = $state<string | null>(null);
+  let selected = $state<string[]>([]);
+  let selectedProducts = $derived(data.products.filter((product) => selected.includes(product.id)));
+  let grouping = $state(false);
+  let groupName = $state('');
+  let groupDescription = $state('');
+  let groupPublication = $state('draft');
+  let savingGroup = $state(false);
+  function openGroup() {
+    groupName = '';
+    groupDescription = '';
+    groupPublication = selectedProducts.every((product) => product.publication === 'published')
+      ? 'published'
+      : 'draft';
+    grouping = true;
+  }
   const labels: Record<string, string> = {
     published: 'No catálogo',
     draft: 'Rascunho',
@@ -23,11 +40,124 @@
     <h1>Seu catálogo</h1>
     <p>{data.products.length} produtos · Um carinho para cada ocasião.</p>
   </div>
-  <a class="button button-green" href="/admin/produtos/novo"><Plus size={18} />Novo produto</a>
+  <div class="admin-heading-actions">
+    <a class="button button-outline" href="/admin/produtos/lote"
+      ><Layers size={18} />Cadastro em lote</a
+    ><a class="button button-green" href="/admin/produtos/novo"><Plus size={18} />Novo produto</a>
+  </div>
 </div>
-<FormFeedback {form} />
+<FormFeedback
+  form={grouping ? null : form}
+  savedMessage={data.createdCount ? `${data.createdCount} produtos cadastrados.` : undefined}
+/>
+{#if data.products.length}<div class="catalog-selection-bar">
+    <label class="check-row"
+      ><input
+        type="checkbox"
+        aria-label="Selecionar todos os produtos"
+        checked={selectedProducts.length === data.products.length}
+        onchange={(event) => {
+          selected = event.currentTarget.checked ? data.products.map((product) => product.id) : [];
+        }}
+      />Selecionar todos</label
+    >
+    <span>{selectedProducts.length} selecionados</span>
+    <button class="button button-outline" disabled={selectedProducts.length < 2} onclick={openGroup}
+      ><Layers size={18} />Juntar selecionados</button
+    >
+  </div>{/if}
+<Dialog.Root bind:open={grouping}
+  ><Dialog.Content class="group-products-dialog">
+    <Dialog.Header
+      ><Dialog.Title>Juntar {selectedProducts.length} produtos</Dialog.Title><Dialog.Description
+        >As fotos, preços, referências e descrições serão mantidos como opções de um só produto.</Dialog.Description
+      ></Dialog.Header
+    >
+    <form
+      method="POST"
+      action="?/group"
+      use:enhance={() => {
+        savingGroup = true;
+        return async ({ update }) => {
+          try {
+            await update({ reset: false });
+          } finally {
+            savingGroup = false;
+          }
+        };
+      }}
+    >
+      <FormFeedback {form} notificationId="group-feedback" />
+      {#each selectedProducts as product}<input
+          type="hidden"
+          name="productIds"
+          value={product.id}
+        />{/each}
+      <ul class="group-preview">
+        {#each selectedProducts as product}<li>
+            {product.name}
+            <span
+              >({product.variants.length}
+              {product.variants.length === 1 ? 'opção' : 'opções'})</span
+            >
+          </li>{/each}
+      </ul>
+      <label for="group-name">Nome do produto agrupado</label><input
+        id="group-name"
+        name="name"
+        required
+        minlength="2"
+        maxlength="180"
+        bind:value={groupName}
+        placeholder="Ex.: Orquídeas"
+      />
+      <label for="group-description">Descrição do grupo (opcional)</label><textarea
+        id="group-description"
+        name="description"
+        bind:value={groupDescription}
+        rows="2"
+        maxlength="6000"></textarea>
+      <label for="group-publication">Visibilidade do grupo</label><select
+        id="group-publication"
+        name="publication"
+        bind:value={groupPublication}
+        ><option value="published">Publicado no catálogo</option><option value="draft"
+          >Rascunho</option
+        ><option value="hidden">Escondido do catálogo</option></select
+      >
+      <p class="notice">
+        Os cadastros selecionados serão substituídos pelo grupo. Depois você poderá ajustar cada
+        opção no editor.
+      </p>
+      <div class="form-actions">
+        <button class="button button-green" disabled={savingGroup || selectedProducts.length < 2}
+          >{savingGroup ? 'Juntando…' : `Juntar ${selectedProducts.length} produtos`}</button
+        ><button
+          type="button"
+          class="button button-outline"
+          disabled={savingGroup}
+          onclick={() => {
+            grouping = false;
+          }}>Cancelar</button
+        >
+      </div>
+    </form>
+  </Dialog.Content></Dialog.Root
+>
 <div class="admin-products">
-  {#each data.products as product}<article class="admin-product" data-testid="admin-product">
+  {#each data.products as product}<article
+      class="admin-product selectable"
+      class:selected={selected.includes(product.id)}
+      data-testid="admin-product"
+    >
+      <label class="admin-product-selector"
+        ><input
+          type="checkbox"
+          value={product.id}
+          bind:group={selected}
+          aria-label={`Selecionar ${product.name}`}
+        /></label
+      >
       <div class="admin-product-image">
         {#if product.images[0]}<img src={product.images[0].url} alt="" />{:else}<span>Sem foto</span
           >{/if}

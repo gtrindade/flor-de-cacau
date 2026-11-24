@@ -10,4 +10,5 @@
     categories={data.categories}
     {form}
     saved={data.saved}
+    notice={data.notice}
   />{/key}

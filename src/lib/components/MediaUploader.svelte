@@ -29,6 +29,7 @@
     initial = [],
     name = 'mediaIds',
     max = 8,
+    individualProducts = false,
     busy = $bindable(false),
     photos = $bindable<UploadPhoto[]>(
       untrack(() => initial.map((photo) => ({ ...photo, key: photo.id })))
@@ -38,6 +39,7 @@
     initial?: Photo[];
     name?: string;
     max?: number | null;
+    individualProducts?: boolean;
     busy?: boolean;
     photos?: UploadPhoto[];
     details?: Snippet<[UploadPhoto, number]>;
@@ -388,7 +390,13 @@
             Foto {index + 1}
           </div>{/if}
         {#if photo.id}
-          <span class="photo-index">{index === 0 ? 'Capa' : `Foto ${index + 1}`}</span>
+          <span class="photo-index"
+            >{individualProducts
+              ? `Produto ${index + 1}`
+              : index === 0
+                ? 'Capa'
+                : `Foto ${index + 1}`}</span
+          >
           <div class="photo-controls">
             <button
               type="button"
@@ -453,5 +461,7 @@
 <p class="field-hint">
   {max === 1
     ? 'A foto aparecerá na seção Nossa história.'
-    : 'A primeira foto é a capa. Use as setas para reorganizar.'}
+    : individualProducts
+      ? 'Cada foto será um produto separado. Use as setas para reorganizar.'
+      : 'A primeira foto é a capa. Use as setas para reorganizar.'}
 </p>

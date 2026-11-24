@@ -343,13 +343,13 @@ test('indisponível é somente visualização; sob consulta permite solicitar', 
 test('preço privado não aparece em HTML, navegação ou mensagem', async ({ page, request }) => {
   const response = await request.get('/produtos/tulipas');
   const html = await response.text();
-  expect(html).not.toContain('73891');
+  expect(html).not.toMatch(/(?<![\w-])73891(?![\w-])/);
   expect(html).not.toMatch(/738[,.]91/);
   await openOrder(page, 'tulipas');
   await expect(page.getByRole('dialog')).toContainText('Preço sob consulta');
   const text = await collectWhatsApp(page);
   expect(text).toContain('consultar o preço');
-  expect(text).not.toContain('738');
+  expect(text).not.toMatch(/(?<![\w-])738(?![\w-])/);
   expect(text).not.toContain('Preço anunciado');
 });
 test('busca por referência ignora caixa e respeita categorias e visibilidade', async ({
@@ -707,47 +707,54 @@ test('produto com fotos: retry, preservar erro, reordenar, publicar, esconder e 
   const [row] = (await pool.query('SELECT slug FROM products WHERE id=$1', [id])).rows;
   const slug = row.slug;
   const publicPage = await page.context().browser()!.newContext();
-  const customer = await publicPage.newPage();
-  await customer.goto(`/produtos/${slug}`);
-  await expect(customer.getByRole('heading', { name })).toBeVisible();
-  const mediaId = JSON.parse(cover)[0];
-  expect((await publicPage.request.get(`/media/${mediaId}`)).status()).toBe(200);
-  await page.getByLabel('Disponibilidade', { exact: true }).selectOption('unavailable');
-  await saveProduct(page);
-  await expect(page.getByRole('status')).toContainText('salvo');
-  await customer.reload();
-  await expect(
-    customer.getByText('Este produto está indisponível no momento.', { exact: true })
-  ).toBeVisible();
-  await expect(
-    customer.getByRole('button', { name: /Pedir via WhatsApp|Consultar disponibilidade/ })
-  ).toHaveCount(0);
-  await page.getByLabel('Visibilidade', { exact: true }).selectOption('hidden');
-  await saveProduct(page);
-  await expect(page.getByRole('status')).toContainText('salvo');
-  expect((await publicPage.request.get(`/produtos/${slug}`)).status()).toBe(404);
-  expect((await publicPage.request.get(`/media/${mediaId}`)).status()).toBe(404);
-  await page.getByLabel('Visibilidade', { exact: true }).selectOption('published');
-  await page.getByLabel('Exibir preço no catálogo', { exact: true }).uncheck();
-  await saveProduct(page);
-  await expect(page.getByRole('status')).toContainText('salvo');
-  const html = await (await publicPage.request.get(`/produtos/${slug}`)).text();
-  expect(html).not.toContain('8990');
-  await page.getByRole('link', { name: 'Voltar aos produtos' }).click();
-  const card = page
-    .getByTestId('admin-product')
-    .filter({ has: page.getByRole('heading', { name, exact: true }) });
-  await card.getByRole('button', { name: `Excluir ${name}`, exact: true }).click();
-  await card.getByLabel('Nome do produto para confirmar').fill('errado');
-  await card.getByRole('button', { name: 'Excluir permanentemente' }).click();
-  await expect(page.getByRole('alert')).toContainText('nome exato');
-  await card.getByRole('button', { name: `Excluir ${name}`, exact: true }).click();
-  await card.getByLabel('Nome do produto para confirmar').fill(name);
-  await card.getByRole('button', { name: 'Excluir permanentemente' }).click();
-  await expect(page.getByRole('status')).toContainText('excluído');
-  expect((await publicPage.request.get(`/produtos/${slug}`)).status()).toBe(404);
-  expect((await request.get(`/media/${mediaId}`)).status()).toBe(404);
-  await publicPage.close();
+  try {
+    const customer = await publicPage.newPage();
+    await customer.goto(`/produtos/${slug}`);
+    await expect(customer.getByRole('heading', { name })).toBeVisible();
+    const mediaId = JSON.parse(cover)[0];
+    expect((await publicPage.request.get(`/media/${mediaId}`)).status()).toBe(200);
+    await page.getByLabel('Disponibilidade', { exact: true }).selectOption('unavailable');
+    await saveProduct(page);
+    await expect(page.getByRole('status')).toContainText('salvo');
+    await customer.reload();
+    await expect(
+      customer.getByText('Este produto está indisponível no momento.', { exact: true })
+    ).toBeVisible();
+    await expect(
+      customer.getByRole('button', { name: /Pedir via WhatsApp|Consultar disponibilidade/ })
+    ).toHaveCount(0);
+    await page.getByLabel('Visibilidade', { exact: true }).selectOption('hidden');
+    await saveProduct(page);
+    await expect(page.getByRole('status')).toContainText('salvo');
+    expect((await publicPage.request.get(`/produtos/${slug}`)).status()).toBe(404);
+    expect((await publicPage.request.get(`/media/${mediaId}`)).status()).toBe(404);
+    await page.getByLabel('Visibilidade', { exact: true }).selectOption('published');
+    await page.getByLabel('Exibir preço no catálogo', { exact: true }).uncheck();
+    await saveProduct(page);
+    await expect(page.getByRole('status')).toContainText('salvo');
+    const html = await (await publicPage.request.get(`/produtos/${slug}`)).text();
+    // UUID segments can coincidentally contain the same digits as a price.
+    expect(html).not.toMatch(/(?<![\w-])8990(?![\w-])/);
+    expect(html).toMatch(/priceCents["']?\s*[:=]\s*null\b/);
+    expect(html).not.toMatch(/89[,.]90/);
+    await page.getByRole('link', { name: 'Voltar aos produtos' }).click();
+    const card = page
+      .getByTestId('admin-product')
+      .filter({ has: page.getByRole('heading', { name, exact: true }) });
+    await card.getByRole('button', { name: `Excluir ${name}`, exact: true }).click();
+    await card.getByLabel('Nome do produto para confirmar').fill('errado');
+    await card.getByRole('button', { name: 'Excluir permanentemente' }).click();
+    await expect(page.getByRole('alert')).toContainText('nome exato');
+    await card.getByRole('button', { name: `Excluir ${name}`, exact: true }).click();
+    await card.getByLabel('Nome do produto para confirmar').fill(name);
+    await card.getByRole('button', { name: 'Excluir permanentemente' }).click();
+    await expect(page.getByRole('status')).toContainText('excluído');
+    expect((await publicPage.request.get(`/produtos/${slug}`)).status()).toBe(404);
+    expect((await request.get(`/media/${mediaId}`)).status()).toBe(404);
+  } finally {
+    await cleanupPhotoProduct(page, id);
+    await publicPage.close();
+  }
 });
 test('categorias podem ser criadas, renomeadas e removidas', async ({ page }, info) => {
   await login(page);
@@ -1052,7 +1059,7 @@ test('lote de onze fotos preserva preços, referências e links de cada opção'
     await saveProduct(page);
     await expect(page.getByRole('status')).toContainText('salvo');
     const publicHTML = await (await request.get(deepLink)).text();
-    expect(publicHTML).not.toContain('987654');
+    expect(publicHTML).not.toMatch(/(?<![\w-])987654(?![\w-])/);
     expect(publicHTML).not.toContain('9876,54');
     await page.goto(`/produtos/${product.slug}`);
     await expect(page.getByTestId('photo-option')).toHaveCount(11);
@@ -1075,7 +1082,7 @@ test('lote de onze fotos preserva preços, referências e links de cada opção'
     message = await collectWhatsApp(page);
     expect(message).toContain(chosen.sku);
     expect(message).toContain('consultar o preço');
-    expect(message).not.toContain('9876');
+    expect(message).not.toMatch(/(?<![\w-])9876(?![\w-])/);
     await page.goto(`/admin/produtos/${productId}`);
     await page.getByRole('button', { name: 'Remover foto 2', exact: true }).click();
     await saveProduct(page);
